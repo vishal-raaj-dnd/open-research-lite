@@ -1,13 +1,17 @@
-# DeepResearch-Lite ⚡
+# open-research-lite ⚡
+
+![open-research-lite Banner](assets/banner.png)
+
 > **Token-Efficient Ingestion Middleware & Concept-Diff Engine for Deep Research AI Agents**
 
+[![PyPI version](https://img.shields.io/pypi/v/open-research-lite.svg)](https://pypi.org/project/open-research-lite/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Token Savings](https://img.shields.io/badge/Token_Savings-75%25--85%25-green.svg)](#benchmark--scorecard)
+[![Token Savings](https://img.shields.io/badge/Token_Savings-85%25-green.svg)](#benchmark--scorecard)
 
-`DeepResearch-Lite` is an intelligent, high-performance gatekeeper layer designed for AI Research Agents (such as `langchain-ai/open_deep_research`, `smolagents`, `AutoGPT`, `CrewAI`, or custom LangGraph workflows). 
+`open-research-lite` is an intelligent, high-performance gatekeeper layer designed for AI Research Agents (such as `langchain-ai/open_deep_research`, `gpt-researcher`, `smolagents`, `AutoGPT`, `CrewAI`, or custom LangGraph workflows). 
 
-It solves the **Extreme Token Bloat & Repetitive Fluff** flaw in existing deep research systems by shifting the paradigm from *"Read raw 5,000-word scraped web pages"* to **"Compile knowledge incrementally as it arrives."**
+It solves the **Extreme Token Bloat & Repetitive Fluff** flaw in existing deep research systems by shifting the paradigm from *"Read raw 5,000-word scraped web pages"* to **"Compile knowledge incrementally into a live Session Knowledge Graph."**
 
 ---
 
