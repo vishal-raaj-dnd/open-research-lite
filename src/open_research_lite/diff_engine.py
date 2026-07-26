@@ -93,25 +93,27 @@ class ConceptDiffEngine:
             payload_lines.append(f"**URL**: {source_url}")
             
         reduction_pct = 0
+        output_est = min(len(added_facts), 12) * 8 + len(conflicting_facts) * 20 + 20
         if raw_word_count > 0:
-            output_est = len(added_facts) * 15 + len(conflicting_facts) * 25 + 30
             reduction_pct = max(0, int((1 - (output_est / raw_word_count)) * 100))
 
         payload_lines.append(f"> ⚡ **Gatekeeper Summary**: Processed {raw_word_count} words | Discarded {discard_count} redundant facts (~{reduction_pct}% fluff removed)\n")
 
         if added_facts:
             payload_lines.append("#### 🟢 NEW FACTS ADDED:")
-            for f in added_facts:
+            # Prioritize numeric metrics first, then cap at 12 top facts per source
+            sorted_facts = sorted(added_facts, key=lambda f: f.is_numeric, reverse=True)[:12]
+            for f in sorted_facts:
                 metric_tag = " 📊" if f.is_numeric else ""
-                payload_lines.append(f"- **{f.subject}** ──({f.predicate})──► **{f.object_val}**{metric_tag}")
+                payload_lines.append(f"- **{f.subject}** → *{f.predicate}*: `{f.object_val}`{metric_tag}")
             payload_lines.append("")
 
         if conflicting_facts:
             payload_lines.append("#### ⚠️ CONFLICTS DETECTED:")
-            for inc, ex in conflicting_facts:
+            for inc, ex in conflicting_facts[:5]:
                 payload_lines.append(
-                    f"- **{inc.subject} [{inc.predicate}]**: Current source claims **'{inc.object_val}'**, "
-                    f"contradicting prior record **'{ex.object_val}'** (from {ex.source_url or 'prior source'})."
+                    f"- **{inc.subject} [{inc.predicate}]**: Current claims **'{inc.object_val}'**, "
+                    f"contradicting prior **'{ex.object_val}'**."
                 )
             payload_lines.append("")
 
