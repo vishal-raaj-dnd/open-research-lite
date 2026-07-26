@@ -61,6 +61,16 @@ class Configuration(BaseModel):
             }
         }
     )
+    enable_concept_diff: bool = Field(
+        default=True,
+        metadata={
+            "x_oap_ui_config": {
+                "type": "boolean",
+                "default": True,
+                "description": "Whether to enable DeepResearch-Lite ConceptDiffEngine to strip background fluff and reduce token bloat."
+            }
+        }
+    )
     max_concurrent_research_units: int = Field(
         default=5,
         metadata={

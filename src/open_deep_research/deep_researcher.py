@@ -19,6 +19,17 @@ from langgraph.types import Command
 from open_deep_research.configuration import (
     Configuration,
 )
+from open_deep_research.concept_diff import (
+    ConceptDiffEngine,
+    SessionKnowledgeGraph,
+    TelemetryTracker,
+)
+
+# Global session instance for tracking facts across all researchers in a run
+session_knowledge_graph = SessionKnowledgeGraph()
+session_telemetry = TelemetryTracker()
+session_diff_engine = ConceptDiffEngine(graph=session_knowledge_graph, telemetry=session_telemetry)
+
 from open_deep_research.prompts import (
     clarify_with_user_instructions,
     compress_research_simple_human_message,
@@ -478,15 +489,31 @@ async def researcher_tools(state: ResearcherState, config: RunnableConfig) -> Co
     ]
     observations = await asyncio.gather(*tool_execution_tasks)
     
+    # Process observations through ConceptDiffEngine if enabled
+    processed_observations = []
+    if configurable.enable_concept_diff:
+        for observation, tool_call in zip(observations, tool_calls):
+            if isinstance(observation, str) and len(observation) > 100:
+                diff_payload = await session_diff_engine.process_observation(
+                    raw_text=observation,
+                    source_title=f"Tool: {tool_call['name']}"
+                )
+                processed_observations.append(diff_payload)
+            else:
+                processed_observations.append(observation)
+    else:
+        processed_observations = list(observations)
+
     # Create tool messages from execution results
     tool_outputs = [
         ToolMessage(
-            content=observation,
+            content=obs,
             name=tool_call["name"],
             tool_call_id=tool_call["id"]
         ) 
-        for observation, tool_call in zip(observations, tool_calls)
+        for obs, tool_call in zip(processed_observations, tool_calls)
     ]
+
     
     # Step 3: Check late exit conditions (after processing tools)
     exceeded_iterations = state.get("tool_call_iterations", 0) >= configurable.max_react_tool_calls
