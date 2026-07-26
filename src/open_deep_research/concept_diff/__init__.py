@@ -1,21 +1,25 @@
-"""Concept-Diff Engine package for DeepResearch-Lite.
+"""Concept-Diff Engine package for open_deep_research.
 
-Industry-grade ingestion middleware for deep research agents.
-Provides dynamic Session Knowledge Graph management, dual-layer fact extraction
-(LLM Structured Extraction + Professional Local NLP Mode), and token-dense concept diff payloads.
+Re-exports core classes from open_research_lite for single-source-of-truth consistency.
 """
 
-from open_deep_research.concept_diff.knowledge_graph import SessionKnowledgeGraph, FactAssertion
-from open_deep_research.concept_diff.extractor import DualExtractionPipeline, ProfessionalLocalExtractor
-from open_deep_research.concept_diff.diff_engine import ConceptDiffEngine
-from open_deep_research.concept_diff.telemetry import TelemetryTracker
+from open_research_lite import (
+    ConceptDiffEngine,
+    SessionKnowledgeGraph,
+    FactAssertion,
+    DualExtractionPipeline,
+    UniversalLocalNLPParser,
+    ProfessionalLocalExtractor,
+    TelemetryTracker,
+)
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 __all__ = [
     "SessionKnowledgeGraph",
     "FactAssertion",
     "DualExtractionPipeline",
+    "UniversalLocalNLPParser",
     "ProfessionalLocalExtractor",
     "ConceptDiffEngine",
     "TelemetryTracker",
