@@ -65,5 +65,7 @@ node_modules/
 # Temporary files
 tmp/
 temp/
+wandb/
 
 .langgraph_api
+

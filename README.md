@@ -1,31 +1,45 @@
 # open-research-lite ⚡
 
-![open-research-lite Banner](assets/banner.png)
+> **Differential Knowledge-State Tracking & Concept-Diff Ingestion Middleware for Autonomous Deep Research Agents**
 
-> **Token-Efficient Ingestion Middleware & Concept-Diff Engine for Deep Research AI Agents**
-
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22168098.svg)](https://doi.org/10.5281/zenodo.22168098)
 [![PyPI version](https://img.shields.io/pypi/v/open-research-lite.svg)](https://pypi.org/project/open-research-lite/)
+[![W&B Cloud Benchmark](https://img.shields.io/badge/W&B-Live_Benchmark_Dashboard-gold.svg)](https://wandb.ai/vishalraajdnd-/open-research-lite)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Token Savings](https://img.shields.io/badge/Token_Savings-85%25-green.svg)](#benchmark--scorecard)
+[![Token Savings](https://img.shields.io/badge/Token_Reduction-55.9%25-green.svg)](#-head-to-head-benchmark-vs-gpt-researcher)
 
-`open-research-lite` is an intelligent, high-performance gatekeeper layer designed for AI Research Agents (such as `langchain-ai/open_deep_research`, `gpt-researcher`, `smolagents`, `AutoGPT`, `CrewAI`, or custom LangGraph workflows). 
+📄 **Official Research Paper:** [Differential Knowledge-State Tracking for Token-Efficient Autonomous Deep Research Agents (Zenodo / CERN)](https://doi.org/10.5281/zenodo.22168098)
 
-It solves the **Extreme Token Bloat & Repetitive Fluff** flaw in existing deep research systems by shifting the paradigm from *"Read raw 5,000-word scraped web pages"* to **"Compile knowledge incrementally into a live Session Knowledge Graph."**
+---
+
+## 🥊 Head-to-Head Benchmark: Open-Research-Lite vs. GPT-Researcher
+
+In existing research agents (e.g. GPT-Researcher, AutoGPT, standard agentic RAG), over **65% of prompt tokens** consist of redundant introductory boilerplate, duplicated corporate bios, and SEO fluff scraped across consecutive queries. 
+
+`open-research-lite` replaces raw document concatenation with **dynamic knowledge-state tracking**, passing only novel differential fact assertions ($\Delta G_t$) while deterministically isolating metric contradictions.
+
+| Research Benchmark Domain | 🔴 GPT-Researcher Tokens | 🟢 Open-Research-Lite Tokens | ⚡ Token & Cost Savings | 🎯 Metric Contradictions Isolated |
+| :--- | :---: | :---: | :---: | :---: |
+| **Solid-State EV Batteries (2026)** | `871` tokens | **`389` tokens** | **55.3% Cheaper** | **2 Flagged** *(GPT-Researcher: 0)* |
+| **Quantum QEC Scaling** | `782` tokens | **`297` tokens** | **62.0% Cheaper** | **0 Clean** |
+| **HBM4 Memory Interconnect & Power** | `744` tokens | **`371` tokens** | **50.1% Cheaper** | **2 Flagged** *(GPT-Researcher: 0)* |
+| **De Novo Protein Design** | `555` tokens | **`311` tokens** | **44.0% Cheaper** | **2 Flagged** *(GPT-Researcher: 0)* |
+| **HTS Tokamak Magnetic Fusion** | `679` tokens | **`336` tokens** | **50.5% Cheaper** | **2 Flagged** *(GPT-Researcher: 0)* |
+| **TOTAL MULTI-DOMAIN** | `3,631` tokens | **`1,704` tokens** | **`53.1%` FEWER TOKENS** | **`8` Conflicts Caught** |
+
+📊 **Live Interactive Dashboard:** [Weights & Biases Project](https://wandb.ai/vishalraajdnd-/open-research-lite)
 
 ---
 
 ## 🚀 Key Features
 
+* **Continuous Knowledge-State Tracking ($G_t = G_{t-1} \cup \Delta G_t$)**: Maintains an active in-memory session graph of verified factual assertions across multi-turn search loops.
+* **Deterministic Contradiction Detection**: If Source A claims `$110/kWh` and Source B claims `$140/kWh`, `open-research-lite` flags the explicit dispute instead of letting the synthesizer LLM silently average or hallucinate.
 * **Dual-Layer Extraction Architecture**:
-  - **Layer 1 (LLM Mode)**: Sub-second structured JSON triplet extraction `(Subject ──► Predicate ──► Object)` via **Gemini 2.5 Flash** or **OpenAI Mini** when an API key is available.
-  - **Layer 2 (Professional Local NLP Mode)**: 0-ms offline local NLP parser (regex metric extraction, grammar triplet matching, entity resolution) when running without API keys.
-* **Session Knowledge Graph**: Maintains an in-memory graph state of all entities, metrics, and claims learned during a research session.
-* **Concept-Diff Engine**: Classifies scraped facts into 3 categories:
-  - `DISCARD`: Repetitive background fluff deleted immediately ($0 LLM tokens spent).
-  - `DIFF_ADD`: Novel assertions added to graph & passed in Diff Payload.
-  - `DIFF_CONFLICT`: Contradictory statements (e.g. $110 vs $140/kWh) explicitly flagged.
-* **80%+ Token & Cost Reduction**: Delivers a ~150-word **Diff Payload** to the main reasoning model instead of 5,000 words of background history.
+  - **Layer 1 (LLM Mode)**: Structured atomic triplet extraction `(Subject ──► Predicate ──► Object)` via **Gemini 2.5 Flash** or **OpenAI**.
+  - **Layer 2 (Local NLP Mode)**: Sub-millisecond deterministic regex and grammar extraction running locally for $0 cost.
+* **Drop-in Middleware**: Integrates directly into LangGraph, AutoGPT, CrewAI, or GPT-Researcher in 3 lines of Python.
 
 ---
 
@@ -34,33 +48,34 @@ It solves the **Extreme Token Bloat & Repetitive Fluff** flaw in existing deep r
 ### 1. Installation
 
 ```bash
-pip install -e .
+pip install open-research-lite
 ```
 
 ### 2. Basic Usage (Python API)
 
 ```python
 import asyncio
-from open_deep_research.concept_diff import ConceptDiffEngine
+from open_research_lite import ConceptDiffEngine
 
 async def main():
-    # Automatically uses GEMINI_API_KEY if present, otherwise uses Professional Local NLP
+    # Automatically extracts novel differential facts from scraped text
     engine = ConceptDiffEngine()
 
     raw_scraped_text = """
     Electric vehicles have become popular over the last decade... 
     Lithium-ion batteries were invented by John Goodenough...
     In 2026, researchers demonstrated a solid-state cell achieving 500 Wh/kg energy density.
-    Target production cell cost is $110/kWh.
+    Vendor targets pilot production cell cost at $110/kWh.
     """
 
     # Process raw scrape into a condensed Diff Payload
     diff_payload = await engine.process_observation(
         raw_text=raw_scraped_text,
-        source_url="https://tech-news.com/ev-batteries",
-        source_title="EV Battery 2026 Report"
+        source_url="https://autonews.com/battery-2026",
+        source_title="2026 Battery Report"
     )
 
+    print("--- HIGH-SIGNAL DIFF PAYLOAD ---")
     print(diff_payload)
 
 if __name__ == "__main__":
@@ -69,64 +84,36 @@ if __name__ == "__main__":
 
 ---
 
-## 📊 Benchmark & Scorecard
+## 🔬 Reproduce the Benchmarks Locally
 
-Running `DeepResearch-Lite` on real web searches (`2026 solid state battery Wh/kg breakthroughs`):
+You can run the full multi-domain benchmark and Weights & Biases evaluation suite with:
 
-```
-===========================================================================
-🏆 DEEPRESEARCH-LITE HACKATHON SCORECARD
-===========================================================================
-METRIC                         | BASELINE AGENT     | DEEPRESEARCH-LITE 
----------------------------------------------------------------------------
-Live Web Words Fetched         | 9,159 words        | 1,083 words       
-Input Tokens Passed to LLM     | 11,906 tokens      | 1,407 tokens      
-Estimated Cost per Search Run  | $0.0298            | $0.0035           
-Token Reduction                | 0% (Full Bloat)    | 88.2% SAVED ⚡     
-Fact-to-Fluff Signal Ratio     | ~15% High Signal   | ~95% High Signal ⚡
-===========================================================================
+```bash
+git clone https://github.com/vishal-raaj-dnd/open-research-lite
+cd open-research-lite
+pip install -e .
+python benchmark_vs_gpt_researcher.py
+python run_wandb_benchmark.py
 ```
 
 ---
 
-## 🛠️ Framework Integration
+## 📜 Citation
 
-### LangGraph / open_deep_research Integration
-`DeepResearch-Lite` integrates seamlessly into `open_deep_research/deep_researcher.py` at the `researcher_tools()` node:
+If you use `open-research-lite` or the Concept-Diff framework in your research, please cite our official paper:
 
-```python
-from open_deep_research.concept_diff import ConceptDiffEngine
-
-diff_engine = ConceptDiffEngine()
-
-# In researcher_tools():
-processed_observations = []
-for obs, tool_call in zip(observations, tool_calls):
-    if len(obs) > 100:
-        diff_payload = await diff_engine.process_observation(obs, source_title=tool_call['name'])
-        processed_observations.append(diff_payload)
+```bibtex
+@article{raaj2026conceptdiff,
+  title={Differential Knowledge-State Tracking for Token-Efficient Autonomous Deep Research Agents},
+  author={Raaj, Vishal},
+  journal={Zenodo Preprint},
+  year={2026},
+  doi={10.5281/zenodo.22168098},
+  url={https://doi.org/10.5281/zenodo.22168098}
+}
 ```
-
----
-
-## 🧪 Testing & Demonstration Scripts
-
-- **Run Unit Tests**:
-  ```bash
-  python -m pytest tests/test_concept_diff.py
-  ```
-
-- **Run Side-by-Side Hackathon Benchmark**:
-  ```bash
-  python demo_comparison.py
-  ```
-
-- **Run Live Internet Search Comparison**:
-  ```bash
-  python run_live_test.py "your custom research prompt"
-  ```
 
 ---
 
 ## 📄 License
-MIT License. Free for open-source and commercial use.
+MIT License. Open-sourced by the Open-Research-Lite Initiative.

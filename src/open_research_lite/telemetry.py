@@ -29,6 +29,17 @@ class TelemetryTracker:
         saved = self.total_input_words - self.total_output_words
         return round(max(0.0, (saved / self.total_input_words) * 100.0), 2)
 
+    def get_summary(self) -> dict:
+        return {
+            "total_input_words": self.total_input_words,
+            "total_output_words": self.total_output_words,
+            "facts_added": self.adds_count,
+            "facts_discarded_duplicate": self.discards_count,
+            "facts_conflicted": self.conflicts_count,
+            "token_savings_pct": self.get_token_savings_percentage(),
+            "total_facts_extracted": self.adds_count + self.discards_count + self.conflicts_count
+        }
+
     def print_summary(self):
         saved_pct = self.get_token_savings_percentage()
         print("\n" + "="*60)

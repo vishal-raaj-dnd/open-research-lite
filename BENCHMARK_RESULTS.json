@@ -1,0 +1,86 @@
+{
+  "suite": "open-research-lite-eval-v1",
+  "timestamp": "2026-08-29T22:30:02Z",
+  "overall_token_reduction_pct": 30.3,
+  "total_baseline_tokens": 1803,
+  "total_lite_tokens": 1257,
+  "total_baseline_cost_usd": 0.0045,
+  "total_lite_cost_usd": 0.00314,
+  "test_cases": [
+    {
+      "id": "EV-BATTERY-2026",
+      "domain": "Hardware & Energy",
+      "topic": "2026 Solid-State EV Battery Commercialization & Cost Trajectory",
+      "sources_count": 3,
+      "baseline": {
+        "words": 647,
+        "tokens": 860,
+        "cost_usd": 0.00215,
+        "latency_sec": 0.051
+      },
+      "lite": {
+        "words": 440,
+        "tokens": 585,
+        "cost_usd": 0.00146,
+        "latency_sec": 0.006,
+        "facts_extracted": 22,
+        "facts_added": 20,
+        "duplicates_discarded": 0,
+        "conflicts_flagged": 2
+      },
+      "token_reduction_pct": 32.0,
+      "cost_reduction_pct": 32.0,
+      "speedup_factor": 8.5
+    },
+    {
+      "id": "QUANTUM-LLM-2026",
+      "domain": "Quantum Computing & AI",
+      "topic": "Fault-Tolerant Quantum Error Correction Thresholds",
+      "sources_count": 2,
+      "baseline": {
+        "words": 363,
+        "tokens": 482,
+        "cost_usd": 0.0012,
+        "latency_sec": 0.05
+      },
+      "lite": {
+        "words": 224,
+        "tokens": 297,
+        "cost_usd": 0.00074,
+        "latency_sec": 0.003,
+        "facts_extracted": 12,
+        "facts_added": 12,
+        "duplicates_discarded": 0,
+        "conflicts_flagged": 0
+      },
+      "token_reduction_pct": 38.4,
+      "cost_reduction_pct": 38.4,
+      "speedup_factor": 16.67
+    },
+    {
+      "id": "GPU-DATACENTER-2026",
+      "domain": "AI Infrastructure",
+      "topic": "High-Bandwidth Memory (HBM4) Power Consumption & Interconnect Bandwidth",
+      "sources_count": 2,
+      "baseline": {
+        "words": 347,
+        "tokens": 461,
+        "cost_usd": 0.00115,
+        "latency_sec": 0.05
+      },
+      "lite": {
+        "words": 282,
+        "tokens": 375,
+        "cost_usd": 0.00094,
+        "latency_sec": 0.003,
+        "facts_extracted": 11,
+        "facts_added": 9,
+        "duplicates_discarded": 0,
+        "conflicts_flagged": 2
+      },
+      "token_reduction_pct": 18.7,
+      "cost_reduction_pct": 18.7,
+      "speedup_factor": 16.67
+    }
+  ]
+}
