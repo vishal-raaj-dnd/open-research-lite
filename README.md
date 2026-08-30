@@ -1,3 +1,23 @@
+---
+title: Open Research Lite
+emoji: ⚡
+colorFrom: indigo
+colorTo: blue
+sdk: gradio
+sdk_version: 4.44.0
+app_file: app.py
+pinned: false
+license: mit
+short_description: Slash Deep Research agent token bloat by 56%
+tags:
+  - deep-research
+  - llm-agents
+  - knowledge-graph
+  - agentic-rag
+  - token-optimization
+  - paper:10.5281/zenodo.22168098
+---
+
 # open-research-lite ⚡
 
 > **Differential Knowledge-State Tracking & Concept-Diff Ingestion Middleware for Autonomous Deep Research Agents**
