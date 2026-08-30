@@ -6,7 +6,6 @@
 **Publication Record:** [Zenodo Record #22168098](https://zenodo.org/records/22168098)  
 **Repository:** [https://github.com/vishal-raaj-dnd/open-research-lite](https://github.com/vishal-raaj-dnd/open-research-lite)  
 **Package:** `pip install open-research-lite`  
-**Cloud Evaluation:** [https://wandb.ai/vishalraajdnd-/open-research-lite](https://wandb.ai/vishalraajdnd-/open-research-lite)
 
 ---
 

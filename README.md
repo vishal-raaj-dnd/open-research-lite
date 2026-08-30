@@ -4,7 +4,6 @@
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22168098.svg)](https://doi.org/10.5281/zenodo.22168098)
 [![PyPI version](https://img.shields.io/pypi/v/open-research-lite.svg)](https://pypi.org/project/open-research-lite/)
-[![W&B Cloud Benchmark](https://img.shields.io/badge/W&B-Live_Benchmark_Dashboard-gold.svg)](https://wandb.ai/vishalraajdnd-/open-research-lite)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Token Savings](https://img.shields.io/badge/Token_Reduction-55.9%25-green.svg)](#-head-to-head-benchmark-vs-gpt-researcher)
@@ -27,8 +26,6 @@ In existing research agents (e.g. GPT-Researcher, AutoGPT, standard agentic RAG)
 | **De Novo Protein Design** | `555` tokens | **`311` tokens** | **44.0% Cheaper** | **2 Flagged** *(GPT-Researcher: 0)* |
 | **HTS Tokamak Magnetic Fusion** | `679` tokens | **`336` tokens** | **50.5% Cheaper** | **2 Flagged** *(GPT-Researcher: 0)* |
 | **TOTAL MULTI-DOMAIN** | `3,631` tokens | **`1,704` tokens** | **`53.1%` FEWER TOKENS** | **`8` Conflicts Caught** |
-
-📊 **Live Interactive Dashboard:** [Weights & Biases Project](https://wandb.ai/vishalraajdnd-/open-research-lite)
 
 ---
 
@@ -86,14 +83,13 @@ if __name__ == "__main__":
 
 ## 🔬 Reproduce the Benchmarks Locally
 
-You can run the full multi-domain benchmark and Weights & Biases evaluation suite with:
+You can run the full multi-domain benchmark evaluation suite with:
 
 ```bash
 git clone https://github.com/vishal-raaj-dnd/open-research-lite
 cd open-research-lite
 pip install -e .
 python benchmark_vs_gpt_researcher.py
-python run_wandb_benchmark.py
 ```
 
 ---
