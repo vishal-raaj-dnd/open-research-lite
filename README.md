@@ -1,24 +1,3 @@
----
-title: open research-lite
-colorFrom: red
-colorTo: crimson
-sdk: gradio
-sdk_version: 4.44.0
-app_file: app.py
-pinned: false
-license: mit
-short_description: Autonomous Deep Research Agent with Differential Knowledge Graphs and Dual-Model Architecture
-tags:
-  - deep-research
-  - llm-agents
-  - gpt-researcher
-  - knowledge-graph
-  - agentic-rag
-  - token-optimization
-  - dual-model
-  - paper:10.5281/zenodo.22168098
----
-
 # open research-lite
 
 > **Autonomous Deep Research Agent with Differential Knowledge Graphs and Dual-Model Pipeline**  
