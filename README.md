@@ -25,11 +25,15 @@ tags:
 > *Slashes 70–85% token bloat, extracts atomic fact assertions, catches metric contradictions deterministically, and synthesizes executive research dossiers.*
 
 [![PyPI version](https://img.shields.io/pypi/v/open-research-lite.svg)](https://pypi.org/project/open-research-lite/)
-[![Tests](https://img.shields.io/badge/tests-16%2F16%20passing-brightgreen.svg)](#testing--verification)
+[![Tests](https://img.shields.io/badge/tests-17%2F17%20passing-brightgreen.svg)](#testing--verification)
 [![License: MIT](https://img.shields.io/badge/License-MIT-red.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-red.svg)](https://www.python.org/downloads/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22168098.svg)](https://doi.org/10.5281/zenodo.22168098)
 [![Token Savings](https://img.shields.io/badge/Token_Reduction-70%25+-red.svg)](#why-open-research-lite-over-gpt-researcher)
+
+<p align="center">
+  <img src="assets/demo_preview.gif" alt="open-research-lite interactive crimson terminal showcase" width="100%" />
+</p>
 
 ---
 
