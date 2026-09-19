@@ -106,6 +106,25 @@ def resolve_api_key(model_name: str) -> Optional[str]:
     return None
 
 
+def get_env_var_for_model(model_name: str) -> str:
+    """Returns the primary environment variable name for a given model."""
+    m = model_name.lower().strip()
+    if "claude" in m:
+        return "ANTHROPIC_API_KEY"
+    elif "deepseek" in m:
+        return "DEEPSEEK_API_KEY"
+    elif any(k in m for k in ("llama", "mixtral", "qwen")):
+        return "GROQ_API_KEY"
+    elif "gpt" in m or m.startswith("o1") or m.startswith("o3"):
+        return "OPENAI_API_KEY"
+    elif "mistral" in m:
+        return "MISTRAL_API_KEY"
+    elif "gemini" in m:
+        return "GEMINI_API_KEY"
+    return "API_KEY"
+
+
+
 def get_default_models() -> tuple[str, str]:
     """Auto-detects the optimal (extractor_model, writer_model) based on configured environment keys."""
     if os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"):

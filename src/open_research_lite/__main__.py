@@ -73,17 +73,41 @@ def render_banner(console: Console):
     console.print(panel)
 
 
-def _get_api_key_interactive(model_id: str, role_title: str) -> Optional[str]:
-    """Resolves existing API key or prompts user."""
+def _get_api_key_interactive(model_id: str, role_title: str, console: Optional[Console] = None) -> Optional[str]:
+    """Resolves existing API key or prompts user with option to reuse or override."""
+    from open_research_lite.models import resolve_api_key, get_env_var_for_model
+    env_var = get_env_var_for_model(model_id)
     env_key = resolve_api_key(model_id)
-    if env_key:
-        return env_key
-    
-    val = questionary.password(
-        f"Enter API key for {role_title} ({model_id}) [press Enter if configured in environment]:",
-        style=RED_STYLE
-    ).ask()
-    return val.strip() if val and val.strip() else None
+
+    if env_key and env_key.strip():
+        masked = env_key[:4] + "..." + env_key[-4:] if len(env_key) > 8 else "****"
+        use_existing = questionary.confirm(
+            f"Found configured {env_var} for {role_title} ({masked}). Use this key?",
+            default=True,
+            style=RED_STYLE
+        ).ask()
+        if use_existing is None:
+            raise KeyboardInterrupt()
+        if use_existing:
+            return env_key.strip()
+
+    while True:
+        val = questionary.password(
+            f"Enter API key ({env_var}) for {role_title} ({model_id}):",
+            style=RED_STYLE
+        ).ask()
+        if val is None:
+            raise KeyboardInterrupt()
+        val = val.strip()
+        if not val:
+            msg = f"API key cannot be empty for {model_id}. Please enter your key (or press Ctrl+C to cancel):"
+            if console:
+                console.print(f"[bold yellow]{msg}[/bold yellow]")
+            else:
+                print(msg)
+            continue
+        os.environ[env_var] = val
+        return val
 
 
 def main():
@@ -95,7 +119,7 @@ open research-lite: Autonomous Deep Research Agent with Differential Knowledge T
 Usage:
     open-research                          Launch interactive crimson TUI wizard
     open-research "<query>"                Run research directly on target topic
-    python cli.py "<query>"                Direct launcher
+    python -m open_research_lite           Universal launcher
 
 Options:
     -h, --help                             Display this help message
@@ -115,18 +139,21 @@ Options:
         ext_key = resolve_api_key(default_ext)
         wri_key = resolve_api_key(default_wri)
 
-        asyncio.run(_execute_research(
-            console=console or Console(),
-            query=query,
-            extractor_model=default_ext,
-            writer_model=default_wri,
-            extractor_api_key=ext_key,
-            writer_api_key=wri_key,
-            search_api=search_api,
-            max_sources=5
-        ))
+        try:
+            asyncio.run(_execute_research(
+                console=console or Console(),
+                query=query,
+                extractor_model=default_ext,
+                writer_model=default_wri,
+                extractor_api_key=ext_key,
+                writer_api_key=wri_key,
+                search_api=search_api,
+                max_sources=5
+            ))
+        except (KeyboardInterrupt, EOFError):
+            print("\nSession terminated by user.")
+            sys.exit(0)
         return
-
 
     if not HAS_TUI or not sys.stdin.isatty():
         _headless_cli()
@@ -139,16 +166,18 @@ Options:
         try:
             # 1. Research Topic Prompt
             query = questionary.text(
-                "What topic would you like to research?",
+                "What topic would you like to research? (Press Ctrl+C anytime to exit)",
                 default="High-Bandwidth Memory HBM4 Architecture and Interconnect Scaling",
                 style=RED_STYLE
             ).ask()
 
-            if not query or not query.strip():
-                console.print("[dim]No query provided. Exiting.[/dim]")
-                break
+            if query is None:
+                raise KeyboardInterrupt()
 
             query = query.strip()
+            if not query or query.lower() in ("exit", "quit", "q", ":q"):
+                console.print("[dim]Session ended by user.[/dim]")
+                break
 
             # 2. Select Fast LLM (Fact Extractor)
             extractor_choices = [item["label"] for item in SMALL_EXTRACTOR_MODELS]
@@ -158,12 +187,12 @@ Options:
                 style=RED_STYLE
             ).ask()
 
-            if not selected_ext_label:
-                break
+            if selected_ext_label is None:
+                raise KeyboardInterrupt()
 
             selected_ext = next((m for m in SMALL_EXTRACTOR_MODELS if m["label"] == selected_ext_label), SMALL_EXTRACTOR_MODELS[0])
             extractor_model_id = selected_ext["id"]
-            extractor_api_key = _get_api_key_interactive(extractor_model_id, "Fast LLM")
+            extractor_api_key = _get_api_key_interactive(extractor_model_id, "Fast LLM", console)
 
             # 3. Select Smart LLM (Report Writer)
             writer_choices = [item["label"] for item in MAIN_WRITER_MODELS]
@@ -173,30 +202,59 @@ Options:
                 style=RED_STYLE
             ).ask()
 
-            if not selected_writer_label:
-                break
+            if selected_writer_label is None:
+                raise KeyboardInterrupt()
 
             selected_writer = next((m for m in MAIN_WRITER_MODELS if m["label"] == selected_writer_label), MAIN_WRITER_MODELS[0])
             writer_model_id = selected_writer["id"]
-            writer_api_key = _get_api_key_interactive(writer_model_id, "Smart LLM")
+            writer_api_key = _get_api_key_interactive(writer_model_id, "Smart LLM", console)
 
             # 4. Select Search Engine
             search_choice = questionary.select(
                 "Choose web search provider:",
                 choices=[
-                    "Tavily Search API (Deep web research across multiple pages - Recommended)",
-                    "DuckDuckGo Search (Free, no API key required)"
+                    "DuckDuckGo Search (Free, no API key required - Recommended)",
+                    "Tavily Search API (Deep web research across multiple pages)"
                 ],
                 style=RED_STYLE
             ).ask()
 
+            if search_choice is None:
+                raise KeyboardInterrupt()
+
             search_api = "tavily" if "Tavily" in (search_choice or "") else "duckduckgo"
-            if search_api == "tavily" and not os.getenv("TAVILY_API_KEY"):
-                tav_key = questionary.password("Enter TAVILY_API_KEY (leave empty for DuckDuckGo):", style=RED_STYLE).ask()
-                if tav_key:
-                    os.environ["TAVILY_API_KEY"] = tav_key
+            if search_api == "tavily":
+                tav_env = os.getenv("TAVILY_API_KEY")
+                if tav_env and tav_env.strip():
+                    masked_tav = tav_env[:4] + "..." + tav_env[-4:] if len(tav_env) > 8 else "****"
+                    use_tav = questionary.confirm(
+                        f"Found TAVILY_API_KEY ({masked_tav}). Use this key?",
+                        default=True,
+                        style=RED_STYLE
+                    ).ask()
+                    if use_tav is None:
+                        raise KeyboardInterrupt()
+                    if not use_tav:
+                        tav_key = questionary.password("Enter new TAVILY_API_KEY (or press Enter to use DuckDuckGo):", style=RED_STYLE).ask()
+                        if tav_key is None:
+                            raise KeyboardInterrupt()
+                        if tav_key and tav_key.strip():
+                            os.environ["TAVILY_API_KEY"] = tav_key.strip()
+                        else:
+                            console.print("[dim]No Tavily key entered; continuing with free DuckDuckGo search.[/dim]")
+                            search_api = "duckduckgo"
                 else:
-                    search_api = "duckduckgo"
+                    tav_key = questionary.password(
+                        "Enter TAVILY_API_KEY (or press Enter to use free DuckDuckGo):",
+                        style=RED_STYLE
+                    ).ask()
+                    if tav_key is None:
+                        raise KeyboardInterrupt()
+                    if tav_key and tav_key.strip():
+                        os.environ["TAVILY_API_KEY"] = tav_key.strip()
+                    else:
+                        console.print("[dim]No Tavily key entered; continuing with free DuckDuckGo search.[/dim]")
+                        search_api = "duckduckgo"
 
             # 5. Select Research Depth
             depth_choice = questionary.select(
@@ -209,23 +267,74 @@ Options:
                 style=RED_STYLE
             ).ask()
 
+            if depth_choice is None:
+                raise KeyboardInterrupt()
+
             max_sources = 5
             if "Quick" in (depth_choice or ""):
                 max_sources = 3
             elif "Comprehensive" in (depth_choice or ""):
                 max_sources = 8
 
-            # Run Autonomous Research
-            asyncio.run(_execute_research(
-                console=console,
-                query=query,
-                extractor_model=extractor_model_id,
-                writer_model=writer_model_id,
-                extractor_api_key=extractor_api_key,
-                writer_api_key=writer_api_key,
-                search_api=search_api,
-                max_sources=max_sources
-            ))
+            # Run Autonomous Research with auto-recovery on bad keys or search errors
+            while True:
+                try:
+                    asyncio.run(_execute_research(
+                        console=console,
+                        query=query,
+                        extractor_model=extractor_model_id,
+                        writer_model=writer_model_id,
+                        extractor_api_key=extractor_api_key,
+                        writer_api_key=writer_api_key,
+                        search_api=search_api,
+                        max_sources=max_sources
+                    ))
+                    break
+                except (KeyboardInterrupt, EOFError):
+                    console.print("\n[dim]Mission interrupted by user.[/dim]")
+                    return
+                except Exception as e:
+                    err_str = str(e)
+                    is_auth_error = any(kw in err_str.lower() for kw in (
+                        "api_key", "api key", "401", "authentication", "unauthorized", 
+                        "permission denied", "quota", "invalid_api_key", "forbidden"
+                    ))
+                    is_search_error = any(kw in err_str.lower() for kw in ("tavily", "duckduckgo", "search"))
+
+                    if is_auth_error:
+                        console.print(f"\n[bold red][Authentication Error][/bold red] {err_str}\n")
+                        retry = questionary.confirm(
+                            "An API key was rejected or invalid. Would you like to enter a new API key and retry?",
+                            default=True,
+                            style=RED_STYLE
+                        ).ask()
+                        if retry is None or not retry:
+                            break
+                        extractor_api_key = _get_api_key_interactive(extractor_model_id, "Fast LLM", console)
+                        writer_api_key = _get_api_key_interactive(writer_model_id, "Smart LLM", console)
+                        continue
+
+                    elif is_search_error:
+                        console.print(f"\n[bold red][Search Error][/bold red] {err_str}\n")
+                        retry_search = questionary.confirm(
+                            "Web search failed. Would you like to switch to free DuckDuckGo search (no API key required) and retry?",
+                            default=True,
+                            style=RED_STYLE
+                        ).ask()
+                        if retry_search:
+                            search_api = "duckduckgo"
+                            continue
+                        break
+                    else:
+                        console.print(f"\n[bold red][Error][/bold red] {err_str}\n")
+                        retry_gen = questionary.confirm(
+                            "An error occurred during research. Would you like to retry?",
+                            default=False,
+                            style=RED_STYLE
+                        ).ask()
+                        if retry_gen:
+                            continue
+                        break
 
             # What next?
             next_action = questionary.select(
@@ -250,8 +359,8 @@ Options:
                 break
 
         except (KeyboardInterrupt, EOFError):
-            console.print("\n[dim]Session ended.[/dim]")
-            break
+            console.print("\n[dim]Session terminated by user.[/dim]")
+            sys.exit(0)
 
     console.print("\n[bold red]open research-lite session closed.[/bold red]\n")
 
@@ -331,22 +440,31 @@ async def _execute_research(
 
 
 def _headless_cli():
-    query = " ".join(sys.argv[1:]).strip() if len(sys.argv) > 1 else ""
-    if not query:
-        query = input("Enter your research query:\n> ").strip()
-    if not query:
-        query = "High-Bandwidth Memory HBM4 Architecture and Interconnect Scaling"
+    try:
+        query = " ".join(sys.argv[1:]).strip() if len(sys.argv) > 1 else ""
+        if not query:
+            query = input("Enter your research query (or press Ctrl+C to exit):\n> ").strip()
+        if not query or query.lower() in ("exit", "quit", "q"):
+            print("Session ended.")
+            return
 
-    researcher = Researcher(query=query)
+        researcher = Researcher(query=query)
 
-    async def _run():
-        await researcher.conduct_research()
-        report = await researcher.write_report()
-        print(report)
+        async def _run():
+            await researcher.conduct_research()
+            report = await researcher.write_report()
+            print(report)
 
-    asyncio.run(_run())
-
+        asyncio.run(_run())
+    except (KeyboardInterrupt, EOFError):
+        print("\nSession terminated by user.")
+        sys.exit(0)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (KeyboardInterrupt, EOFError):
+        print("\nSession terminated by user.")
+        sys.exit(0)
+
