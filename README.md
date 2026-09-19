@@ -22,9 +22,10 @@ tags:
 # open research-lite
 
 > **Autonomous Deep Research Agent with Differential Knowledge Graphs and Dual-Model Pipeline**  
-> *Slashes 70%+ token bloat, extracts atomic fact assertions, catches metric contradictions deterministically, and synthesizes executive research dossiers.*
+> *Slashes 70–85% token bloat, extracts atomic fact assertions, catches metric contradictions deterministically, and synthesizes executive research dossiers.*
 
 [![PyPI version](https://img.shields.io/pypi/v/open-research-lite.svg)](https://pypi.org/project/open-research-lite/)
+[![Tests](https://img.shields.io/badge/tests-16%2F16%20passing-brightgreen.svg)](#testing--verification)
 [![License: MIT](https://img.shields.io/badge/License-MIT-red.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-red.svg)](https://www.python.org/downloads/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22168098.svg)](https://doi.org/10.5281/zenodo.22168098)
@@ -34,7 +35,7 @@ tags:
 
 ## Why open research-lite over GPT-Researcher?
 
-In conventional research agents (such as GPT-Researcher), over **70% of prompt tokens** are consumed ingesting repetitive introductory fluff, boilerplate history, and SEO prose across multi-page web search streams. Furthermore, GPT-Researcher's "Fast LLM" is only used for generating search sub-queries, while raw scraped web pages (50,000+ tokens) are dumped into the expensive "Smart LLM". When two sources present divergent metrics (for example, `26W` vs `31W` peak package power), conventional agents silently average or hallucinate.
+In conventional research agents (such as GPT-Researcher), over **70% to 85% of prompt tokens** are consumed ingesting repetitive introductory fluff, boilerplate history, and SEO prose across multi-page web search streams. Furthermore, GPT-Researcher's "Fast LLM" is only used for generating search sub-queries, while raw scraped web pages (50,000+ tokens) are dumped directly into the expensive "Smart LLM". When two sources present divergent metrics (for example, `26W` vs `31W` peak package power), conventional agents silently average or hallucinate.
 
 `open research-lite` introduces an architectural layer add-on with **Session Knowledge-State Tracking ($G_t = G_{t-1} \cup \Delta G_t$)** that supercharges the Fast LLM & Smart LLM pipeline:
 
@@ -183,14 +184,13 @@ Every research mission exports an interactive dark-mode HTML dossier containing:
 ```text
 open-research-lite/
 ├── src/
-│   └── open_research_lite/         # Production package (v0.3.0)
+│   └── open_research_lite/         # Production package (v0.3.1)
 │       ├── __init__.py             # Top-level exports (Researcher, GPTResearcher, exceptions)
 │       ├── __main__.py             # Interactive crimson TUI wizard
 │       ├── researcher.py           # Core orchestrator with bounded async concurrency
 │       ├── diff_engine.py          # Differential fact extraction & contradiction engine
 │       ├── knowledge_graph.py      # Thread-safe SessionKnowledgeGraph (RLock)
 │       ├── models.py               # Multi-provider LLM factory (Google, OpenAI, Anthropic, etc.)
-│       ├── search.py               # Search engine integrations (DuckDuckGo, Tavily, Google)
 │       ├── exceptions.py           # Typed exception hierarchy
 │       └── telemetry.py            # Token cost and latency metrics
 ├── docs/                           # Whitepapers, technical specifications & proposals
@@ -203,30 +203,37 @@ open-research-lite/
 ├── examples/                       # Developer guides & quickstart scripts
 │   ├── quickstart_researcher.py    # Complete Python API walkthrough
 │   └── reports/                    # Domain-specific sample reports
-├── tests/                          # Production unit & integration test suites
+├── tests/                          # Production unit & integration test suites (16/16 passing)
 │   ├── test_researcher.py          # Researcher API, dual models, custom search tests
 │   └── test_concept_diff.py        # Fact diffing and knowledge graph tests
 ├── cli.py                          # Direct launcher
 ├── open-research.cmd               # Custom Windows terminal command
-└── pyproject.toml                  # Package configuration (v0.3.0)
+└── pyproject.toml                  # Package configuration (v0.3.1)
 ```
 
 ---
 
-## Enterprise Production Features (v0.3.0)
+## Enterprise Production Features (v0.3.1)
 
-- **Bounded Asynchronous Concurrency**: Parallel source processing via `asyncio.Semaphore(max_concurrency)` prevents API rate limits and thread starvation during massive web crawls.
+- **Zero Silent Fallback**: Web search failures and credential gaps explicitly raise typed `ConfigurationError` or `SearchProviderError` rather than silently degrading.
+- **Structured Search Ingestion**: DuckDuckGo and Tavily ingest discrete per-source records with real URLs, page titles, and snippets instead of single monolithic text blobs.
+- **Native Model Output Ceilings**: Dynamic resolution sets exact physical output limits (64k for Claude 3.7, 8,192 for Claude 3.5 Sonnet/Haiku, 4,096 for Opus), preventing HTTP 400 Bad Request errors.
+- **Automatic Provider Resolution**: `get_default_models()` auto-detects configured environment keys (Gemini $\to$ OpenAI $\to$ Anthropic $\to$ Groq $\to$ DeepSeek $\to$ Mistral) for true zero-config operation.
+- **Bounded Asynchronous Concurrency**: Parallel source processing via `asyncio.Semaphore(max_concurrency)` prevents API rate limits and thread starvation during web crawls.
 - **Custom Search Provider Injection**: Supply your own search callback (`search_func`) to query internal enterprise databases, vector indices, or proprietary APIs seamlessly.
 - **Structured JSON Export**: Call `export_json("output.json")` or `to_dict()` to ingest research graph nodes, facts, contradiction warnings, and telemetry directly into microservice pipelines.
 - **Strongly-Typed Exceptions**: Catch granular errors (`ConfigurationError`, `SearchProviderError`, `FactExtractionError`, `ReportSynthesisError`) without unhandled crashes or silent mock fallbacks.
-- **Thread-Safe Multi-Tenancy**: `SessionKnowledgeGraph` and `ResearchTelemetry` employ reentrant locking (`threading.RLock`) to guarantee complete thread safety across parallel worker threads.
+- **Thread-Safe Multi-Tenancy**: `SessionKnowledgeGraph` and `TelemetryTracker` employ reentrant locking (`threading.RLock`) to guarantee complete thread safety across parallel worker threads.
 
 ---
 
 ## Testing & Verification
 
 ```bash
-# Run unit tests
+# Run the complete test suite (16 tests)
+pytest tests/ -v
+
+# Or run individual test scripts
 python tests/test_concept_diff.py
 python tests/test_researcher.py
 
