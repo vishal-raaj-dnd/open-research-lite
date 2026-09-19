@@ -62,21 +62,19 @@ In conventional research agents (such as GPT-Researcher), over **70% to 85% of p
 pip install open-research-lite
 ```
 
-### 2. Custom Terminal Commands (No `python -m` Required)
+### 2. Launch the Terminal Wizard
 
-Launch deep autonomous research straight from your terminal using custom executable commands:
-
-```bash
-# Windows
-.\open-research "High-Bandwidth Memory HBM4 Architecture and Interconnect Scaling"
-
-# Or run the interactive crimson TUI wizard
-.\open-research
-```
+After installing via pip, launch the interactive crimson TUI:
 
 ```bash
-# macOS / Linux
-./open-research "Fault-Tolerant Quantum Computing and Surface Code Thresholds"
+# Universal command (works on any OS, no PATH setup needed):
+python -m open_research_lite
+
+# Direct CLI command:
+open-research
+
+# Or pass a research topic directly:
+open-research "High-Bandwidth Memory HBM4 Architecture and Interconnect Scaling"
 ```
 
 *Automatically generates both a clean Markdown dossier (`research_report.md`) and a standalone visual HTML report (`research_report.html`) with embedded interactive Mermaid knowledge graphs!*
