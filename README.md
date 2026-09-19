@@ -81,6 +81,25 @@ open-research "High-Bandwidth Memory HBM4 Architecture and Interconnect Scaling"
 
 ---
 
+### Alternative: Run with Docker (Zero Dependency Conflicts)
+
+Run `open-research-lite` in an isolated container without touching your local Python environment:
+
+```bash
+# Clone repository
+git clone https://github.com/vishal-raaj-dnd/open-research-lite.git
+cd open-research-lite
+
+# Option A: One-liner via Docker Compose (loads .env automatically and mounts reports to your folder)
+docker compose run --rm open-research
+
+# Option B: Standard Docker build & run
+docker build -t open-research-lite .
+docker run -it --rm -v "${PWD}:/workspace" -e GEMINI_API_KEY="your-key" open-research-lite
+```
+
+---
+
 ### 3. Supported Production Models
 
 `open research-lite` supports 18+ production models selectable directly from interactive dropdowns:

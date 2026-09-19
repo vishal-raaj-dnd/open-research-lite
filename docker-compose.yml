@@ -1,0 +1,22 @@
+services:
+  open-research:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: open-research-lite:latest
+    container_name: open-research-lite
+    stdin_open: true
+    tty: true
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+      - TAVILY_API_KEY=${TAVILY_API_KEY:-}
+    volumes:
+      - .:/workspace
