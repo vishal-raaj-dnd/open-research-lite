@@ -20,36 +20,35 @@ from open_research_lite.knowledge_graph import FactAssertion
 
 
 PRESET_SCENARIOS = {
-    "EV Batteries 2026 (Cost & Density)": [
+    "HBM4 Architecture 2026 (Bandwidth & Power)": [
         {
-            "url": "https://tech-auto-daily.com/ev-batteries-2026",
-            "title": "2026 Global Electric Vehicle Battery Report",
+            "url": "https://semiconductor-review.org/hbm4-specs-2026",
+            "title": "2026 High-Bandwidth Memory HBM4 Specification",
             "content": (
-                "Electric vehicles (EVs) rely on rechargeable batteries to supply power. The history of lithium-ion batteries dates back "
-                "to John Goodenough, M. Stanley Whittingham, and Akira Yoshino, who won the Nobel Prize in Chemistry in 2019. "
-                "Elon Musk's Tesla has long dominated the EV industry with lithium iron phosphate and nickel-cobalt chemistries. "
-                "In early 2026, researchers demonstrated a solid-state battery cell achieving an energy density of 500 Wh/kg. "
-                "Pilot line production for these 500 Wh/kg cells is slated to begin in Q3 2027 at a targeted manufacturing cost of $110/kWh."
+                "Artificial intelligence accelerators require immense memory bandwidth to prevent compute stalls. "
+                "The history of DRAM stretches back to Robert Dennard's single-transistor cell invention at IBM in 1968. "
+                "Graphics cards and AI servers have traditionally relied on GDDR and older HBM3e memory packages. "
+                "In early 2026, JEDEC ratified the official HBM4 specification delivering 2.8 TB/s peak bandwidth per stack. "
+                "Base operating power consumption for the 16-high stack is measured at 26W under full continuous saturation."
             )
         },
         {
-            "url": "https://energy-journal-online.org/solid-state-breakthrough",
-            "title": "Solid State Cell Manufacturing & Density Statistics",
+            "url": "https://datacenter-insights.com/memory-thermal-audit",
+            "title": "HBM4 Memory Power and Thermal Audit",
             "content": (
-                "What is a battery? A battery converts chemical energy directly into electrical energy. Electric cars use these packs. "
-                "Lithium batteries were first commercialized by Sony in 1991. Elon Musk founded Tesla in 2003. "
-                "New testing confirms solid-state batteries reaching 500 Wh/kg energy density. "
-                "However, an independent financial audit claims the target cell production cost will be $140/kWh, contradicting early vendor claims of $110/kWh."
+                "What is high bandwidth memory? HBM stacks multiple DRAM dies vertically through silicon vias. "
+                "Computing clusters consume megawatts of electricity to power deep learning inference clusters. "
+                "Laboratory benchmarks confirm HBM4 delivering 2.8 TB/s peak bandwidth per stack across a 2048-bit bus. "
+                "However, an independent thermal audit reports sustained power reaches 31W under continuous load, contradicting the standard vendor rating of 26W."
             )
         },
         {
-            "url": "https://clean-tech-insights.net/next-gen-batteries",
-            "title": "Next-Gen Battery Chemistry Comparison",
+            "url": "https://hardware-analytica.net/hbm4-scaling",
+            "title": "HBM4 Interconnect Scaling Trajectory",
             "content": (
-                "Electric cars are growing worldwide to reduce carbon emissions. Electric vehicles use battery packs underneath the chassis. "
-                "Lithium-ion technology is common across all major automotive manufacturers worldwide. "
-                "Nobel prize winners developed early lithium chemistry in the 1970s and 1980s. "
-                "Pilot line production for new solid-state battery cells remains set for Q3 2027 with silicone-sulfide solid electrolyte."
+                "High-performance computing data centers are modernizing packaging architectures to support generative AI. "
+                "DRAM scaling continues to encounter physical limitations at the sub-nanometer node boundary. "
+                "Base operating power consumption for initial test configurations remains tracked at 26W across pilot wafers."
             )
         }
     ],
@@ -101,7 +100,8 @@ PRESET_SCENARIOS = {
 
 
 async def run_comparison(scenario_name: str, custom_query: str):
-    sources = PRESET_SCENARIOS.get(scenario_name, PRESET_SCENARIOS["EV Batteries 2026 (Cost & Density)"])
+    default_scenario = next(iter(PRESET_SCENARIOS.values()))
+    sources = PRESET_SCENARIOS.get(scenario_name, default_scenario)
     
     # 1. Baseline Run
     baseline_text = ""
@@ -135,13 +135,13 @@ async def run_comparison(scenario_name: str, custom_query: str):
     stats = telemetry.get_summary()
     token_savings_pct = round(((base_tokens - lite_tokens) / base_tokens) * 100, 1) if base_tokens > 0 else 0.0
 
-    scorecard_md = f"""### 📊 Live Benchmark Scorecard
-| Metric | Standard Deep Research | ⚡ Open-Research-Lite | Improvement |
+    scorecard_md = f"""### Benchmark Scorecard
+| Metric | Standard Deep Research | open research-lite | Improvement |
 | :--- | :--- | :--- | :--- |
 | **Input Tokens** | `{base_tokens:,}` tokens | **`{lite_tokens:,}` tokens** | **{token_savings_pct}% Saved** |
 | **Est. API Cost** | `${base_cost:.4f}` | **`${lite_cost:.4f}`** | **{token_savings_pct}% Cheaper** |
 | **Facts Extracted** | Monolithic text dump | **`{stats['total_facts_extracted']}` structured facts** | Clean Graph |
-| **Conflicts Flagged**| ❌ Silent Overwrite | **`{stats['facts_conflicted']}` detected & flagged** | Factual Integrity |
+| **Conflicts Flagged**| Silent Overwrite | **`{stats['facts_conflicted']}` detected & flagged** | Factual Integrity |
 | **Redundant Fluff** | 100% Ingested | **`{stats['facts_discarded_duplicate']}` duplicates pruned** | High SNR |
 """
 
@@ -153,34 +153,35 @@ def launch_gradio():
     .metric-card { background: #1e1e2e; border-radius: 10px; padding: 15px; border: 1px solid #313244; }
     """
     
-    with gr.Blocks(title="Deep Research Arena: Open-Research-Lite Benchmark", theme=gr.themes.Soft(), css=custom_css) as demo:
+    with gr.Blocks(title="Deep Research Arena: open research-lite", theme=gr.themes.Soft(), css=custom_css) as demo:
         gr.Markdown("""
-        # 🔬 Deep Research Arena: Open-Research-Lite
+        # Deep Research Arena: open research-lite
         ### Evaluating Differential Knowledge Graph Middleware against Monolithic Web Search Stuffing
         
         *Token-efficient research middleware that cuts 70%+ token costs and deterministically flags contradictory web facts.*
         
-        [⭐ GitHub Repository](https://github.com/vishal-raaj-dnd/open-research-lite) • [📦 PyPI Package](https://pypi.org/project/open-research-lite/)
+        [GitHub Repository](https://github.com/vishal-raaj-dnd/open-research-lite) • [PyPI Package](https://pypi.org/project/open-research-lite/)
         """)
 
         with gr.Row():
             scenario_dropdown = gr.Dropdown(
                 choices=list(PRESET_SCENARIOS.keys()),
-                value="EV Batteries 2026 (Cost & Density)",
+                value="HBM4 Architecture 2026 (Bandwidth & Power)",
                 label="Select Research Evaluation Scenario"
             )
-            run_btn = gr.Button("🚀 Run Live Side-by-Side Benchmark", variant="primary")
+            run_btn = gr.Button("Run Live Side-by-Side Benchmark", variant="primary")
 
-        scorecard_display = gr.Markdown("### 📊 Benchmark Metrics will appear here upon execution.")
+        scorecard_display = gr.Markdown("### Benchmark Metrics will appear here upon execution.")
 
         with gr.Row():
             with gr.Column():
-                gr.Markdown("### 🔴 Baseline Deep Research (Monolithic Raw Dump)")
+                gr.Markdown("### Baseline Deep Research (Monolithic Raw Dump)")
                 baseline_output = gr.Markdown(value="*Click 'Run Live Side-by-Side Benchmark' to start...*")
 
             with gr.Column():
-                gr.Markdown("### 🟢 Open-Research-Lite (Concept-Diff Engine)")
+                gr.Markdown("### open research-lite (Concept-Diff Engine)")
                 lite_output = gr.Markdown(value="*Click 'Run Live Side-by-Side Benchmark' to start...*")
+
 
         run_btn.click(
             fn=lambda s: asyncio.run(run_comparison(s, "")),

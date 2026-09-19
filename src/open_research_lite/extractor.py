@@ -1,203 +1,159 @@
-"""Universal Dual-Layer Fact Extraction Pipeline for open-research-lite."""
+"""Universal Fast LLM Fact & Contradiction Extraction Pipeline.
 
-import json
+Replaces brittle keyword heuristics and regex guessing with full Fast LLM semantic reasoning
+(e.g., Gemini 2.5 Flash, GPT-4o-Mini, Claude 3.5 Haiku, Llama 3.1 8B).
+Extracts atomic subject-predicate-object assertions, quantitative metrics, operational conditions,
+and detects genuine factual contradictions against existing session knowledge.
+"""
+
 import logging
 import os
 import re
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 from open_research_lite.knowledge_graph import FactAssertion
+from open_research_lite.exceptions import ConfigurationError, FactExtractionError
 
 logger = logging.getLogger("open_research_lite.extractor")
 
 
 class ExtractedFactItem(BaseModel):
-    subject: str = Field(description="Normalized entity or topic name")
-    predicate: str = Field(description="Relationship, verb, or property name")
-    object_val: str = Field(description="Target entity, value, stat, or status")
-    is_numeric: bool = Field(default=False, description="True if value contains numbers, dates, or metrics")
-    context_snippet: str = Field(default="", description="Original sentence snippet containing this fact")
+    """An atomic fact isolated from source text by the Fast LLM."""
+    subject: str = Field(description="Normalized entity, system, or concept name")
+    predicate: str = Field(description="Relationship, verb, or property name (e.g. bandwidth, operates_at, founded_in)")
+    object_val: str = Field(description="Target entity, status, numerical metric, or specific value")
+    is_numeric: bool = Field(default=False, description="True if value contains numbers, dates, units, or currencies")
+    is_multi_valued: bool = Field(default=False, description="True if this relation naturally allows multiple concurrent values (e.g. products, partners)")
+    condition: Optional[str] = Field(default=None, description="Operational scenario or test condition (e.g., 'at idle', 'ambient temp', 'v2 architecture')")
+    context_snippet: str = Field(default="", description="Original sentence snippet from the source supporting this assertion")
 
 
-class ExtractedFactsPayload(BaseModel):
-    facts: List[ExtractedFactItem]
+class ContradictionItem(BaseModel):
+    """A genuine factual or metric contradiction detected against prior knowledge."""
+    subject: str = Field(description="Entity or topic with conflicting claims")
+    existing_claim: str = Field(description="Prior claim or established consensus")
+    conflicting_claim: str = Field(description="The contradictory claim presented in this source")
+    reasoning: str = Field(description="Semantic explanation of why this is a direct contradiction rather than a different variant or condition")
 
 
-class UniversalLocalNLPParser:
-    UNIVERSAL_METRIC_REGEX = re.compile(
-        r'('
-        r'\b[\$\€\£\¥]\s*\d+(?:\.\d+)?(?:\s*(?:billion|million|trillion|k|M|B|T))?\b'
-        r'|\b\d+(?:\.\d+)?\s*(?:Wh/kg|kWh|Wh|MW|GW|TW|GHz|MHz|nm|mm|cm|m|km|miles|kg|lbs|tons|GB|TB|PB|MB/s|GB/s|ms|sec|min|hrs|percent|%)\b'
-        r'|\b\d+(?:\.\d+)?\s*(?:x|x-speedup|times|fold|ratio|x-improvement)\b'
-        r'|\b(?:Q[1-4]\s*\d{4}|\d{4}|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b'
-        r'|\b\d+(?:\.\d+)?\s*to\s*\d+(?:\.\d+)?\b'
-        r')',
-        re.IGNORECASE
-    )
-
-    BOILERPLATE_PATTERNS = [
-        re.compile(r'Accept All Cookies.*', re.IGNORECASE),
-        re.compile(r'Privacy Policy|Terms of Service|Terms of Use|All Rights Reserved|Cookie Preferences', re.IGNORECASE),
-        re.compile(r'Subscribe to newsletter|Sign up for updates|Follow us on Twitter|Share on Facebook', re.IGNORECASE),
-        re.compile(r'Skip to main content|Navigation menu|Toggle navigation', re.IGNORECASE),
-        re.compile(r'<script.*?>.*?</script>', re.DOTALL | re.IGNORECASE),
-        re.compile(r'<style.*?>.*?</style>', re.DOTALL | re.IGNORECASE),
-        re.compile(r'<.*?>', re.DOTALL)
-    ]
-
-    UNIVERSAL_VERBS = {
-        "achieves", "achieved", "reaches", "reached", "demonstrates", "demonstrated",
-        "announces", "announced", "targets", "targeted", "produces", "produced",
-        "costs", "cost", "yields", "yielded", "features", "featured", "launches",
-        "launched", "develops", "developed", "scales", "scaled", "claims", "claimed",
-        "states", "stated", "reports", "reported", "is", "are", "was", "were",
-        "exceeds", "exceeded", "begins", "began", "shows", "showed", "proves",
-        "proved", "indicates", "indicated", "increases", "increased", "decreases",
-        "decreased", "found", "finds", "discovers", "discovered", "publishes", "published"
-    }
-
-    def clean_text(self, text: str) -> str:
-        if not text:
-            return ""
-        cleaned = text
-        for pat in self.BOILERPLATE_PATTERNS:
-            cleaned = pat.sub(' ', cleaned)
-        cleaned = re.sub(r'\s+', ' ', cleaned)
-        return cleaned.strip()
-
-    def extract_facts(
-        self, 
-        text: str, 
-        source_url: str = "", 
-        source_title: str = "",
-        max_sentences: int = 35
-    ) -> List[FactAssertion]:
-        cleaned = self.clean_text(text)
-        if len(cleaned) < 20:
-            return []
-
-        sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', cleaned) if len(s.strip()) > 15]
-        facts: List[FactAssertion] = []
-        seen_keys = set()
-
-        for sentence in sentences[:max_sentences]:
-            has_metric = bool(self.UNIVERSAL_METRIC_REGEX.search(sentence))
-            triplets = self._parse_sentence_triplets(sentence)
-            
-            for subject, predicate, obj in triplets:
-                key = f"{subject.lower()}:{predicate.lower()}:{obj.lower()}"
-                if key not in seen_keys:
-                    seen_keys.add(key)
-                    facts.append(FactAssertion(
-                        subject=subject,
-                        predicate=predicate,
-                        object_val=obj,
-                        is_numeric=has_metric,
-                        source_url=source_url,
-                        source_title=source_title,
-                        context_snippet=sentence[:150]
-                    ))
-        return facts
-
-    def _parse_sentence_triplets(self, sentence: str) -> List[Tuple[str, str, str]]:
-        results = []
-        clauses = [c.strip() for c in re.split(r'[,;]\s+', sentence) if len(c.strip()) > 15]
-        if not clauses:
-            clauses = [sentence]
-
-        for clause in clauses:
-            words = clause.split()
-            if len(words) < 3:
-                continue
-
-            found_verb_idx = -1
-            found_verb = "states"
-
-            for i, word in enumerate(words):
-                clean_word = re.sub(r'\W+', '', word.lower())
-                if clean_word in self.UNIVERSAL_VERBS:
-                    found_verb_idx = i
-                    found_verb = word
-                    break
-
-            if found_verb_idx > 0 and found_verb_idx < len(words) - 1:
-                subject = " ".join(words[:found_verb_idx])
-                obj = " ".join(words[found_verb_idx + 1:])
-            else:
-                subject = " ".join(words[:min(3, len(words))])
-                obj = " ".join(words[min(3, len(words)):])
-
-            subject = re.sub(r'^[^\w]+|[^\w]+$', '', subject).strip()
-            obj = re.sub(r'^[^\w]+|[^\w]+$', '', obj).strip()
-
-            if len(subject) >= 2 and len(obj) >= 2:
-                results.append((subject[:50], found_verb[:30], obj[:90]))
-
-        return results
+class ExtractionResult(BaseModel):
+    """Complete structured output returned by the Fast LLM."""
+    facts: List[ExtractedFactItem] = Field(default_factory=list, description="List of unique factual assertions and metrics")
+    contradictions: List[ContradictionItem] = Field(default_factory=list, description="Contradictions detected against existing session knowledge")
+    redundant_claims_pruned: int = Field(default=0, description="Approximate count of repetitive fluff, introductory boilerplate, or navigation statements discarded")
 
 
-class DualExtractionPipeline:
+class FastLLMExtractor:
+    """Production-grade semantic extractor powered by high-speed, cost-efficient Fast LLMs."""
+
     def __init__(
-        self, 
-        api_key: Optional[str] = None, 
+        self,
+        api_key: Optional[str] = None,
         model_name: str = "gemini-2.5-flash",
         provider: str = "google"
     ):
-        self.api_key = api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or os.getenv("OPENAI_API_KEY")
+        from open_research_lite.models import resolve_api_key
         self.model_name = model_name
         self.provider = provider
-        self.local_extractor = UniversalLocalNLPParser()
+        self.api_key = api_key or resolve_api_key(model_name)
+
+    async def extract(
+        self,
+        raw_text: str,
+        source_url: str = "",
+        source_title: str = "",
+        existing_facts_summary: str = "",
+        max_chars: Optional[int] = None
+    ) -> ExtractionResult:
+        """Extracts facts and analyzes contradictions using the Fast LLM."""
+        if not raw_text or not raw_text.strip():
+            return ExtractionResult()
+
+        if max_chars is not None and max_chars > 0:
+            text_snippet = raw_text[:max_chars].strip()
+        else:
+            text_snippet = raw_text.strip()
+
+        # Fast LLM extraction requires a valid API key
+        if not self.api_key:
+            raise FactExtractionError(
+                f"No API key provided or resolved for Fast LLM extractor model '{self.model_name}'. "
+                "FastLLMExtractor requires a valid provider API key (e.g. GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY) "
+                "to perform high-signal semantic fact extraction."
+            )
+
+        return await self._extract_with_llm(
+            text_snippet=text_snippet,
+            source_url=source_url,
+            source_title=source_title,
+            existing_facts_summary=existing_facts_summary
+        )
 
     async def extract_facts(
-        self, 
-        raw_text: str, 
-        source_url: str = "", 
+        self,
+        raw_text: str,
+        source_url: str = "",
         source_title: str = "",
-        max_chars: int = 10000
+        max_chars: Optional[int] = None
     ) -> List[FactAssertion]:
-        text_snippet = raw_text[:max_chars]
+        """Convenience method returning FactAssertion objects for backward compatibility."""
+        res = await self.extract(raw_text, source_url, source_title, max_chars=max_chars)
+        assertions: List[FactAssertion] = []
+        for item in res.facts:
+            assertions.append(FactAssertion(
+                subject=item.subject.strip(),
+                predicate=item.predicate.strip(),
+                object_val=item.object_val.strip(),
+                is_numeric=item.is_numeric,
+                is_multi_valued=item.is_multi_valued,
+                condition=item.condition,
+                source_url=source_url,
+                source_title=source_title,
+                context_snippet=item.context_snippet.strip()
+            ))
+        return assertions
 
-        if self.api_key:
-            try:
-                if "openai" in self.provider.lower() or "gpt" in self.model_name.lower():
-                    from langchain_openai import ChatOpenAI
-                    llm = ChatOpenAI(
-                        model=self.model_name,
-                        api_key=self.api_key,
-                        temperature=0.0
-                    ).with_structured_output(ExtractedFactsPayload)
-                else:
-                    from langchain_google_genai import ChatGoogleGenerativeAI
-                    llm = ChatGoogleGenerativeAI(
-                        model=self.model_name,
-                        google_api_key=self.api_key,
-                        temperature=0.0
-                    ).with_structured_output(ExtractedFactsPayload)
+    async def _extract_with_llm(
+        self,
+        text_snippet: str,
+        source_url: str,
+        source_title: str,
+        existing_facts_summary: str
+    ) -> ExtractionResult:
+        from open_research_lite.models import get_chat_model
 
-                prompt = (
-                    "Extract all unique, high-signal atomic facts, metrics, breakthrough claims, dates, and prices from the text.\n"
-                    "Ignore introductory background fluff, company history, navigation text, or basic definitions.\n"
-                    "Output a clean array of Subject-Predicate-Object triplets.\n\n"
-                    f"SOURCE TITLE: {source_title}\n"
-                    f"TEXT:\n{self.local_extractor.clean_text(text_snippet)}\n"
-                )
+        base_llm = get_chat_model(self.model_name, self.api_key)
+        llm = base_llm.with_structured_output(ExtractionResult)
 
-                res: ExtractedFactsPayload = await llm.ainvoke(prompt)
-                
-                assertions = []
-                for item in res.facts:
-                    assertions.append(FactAssertion(
-                        subject=item.subject.strip(),
-                        predicate=item.predicate.strip(),
-                        object_val=item.object_val.strip(),
-                        is_numeric=item.is_numeric,
-                        source_url=source_url,
-                        source_title=source_title,
-                        context_snippet=item.context_snippet.strip()
-                    ))
-                return assertions
-            except Exception as e:
-                logger.warning(f"Layer 1 (LLM) failed: {e}. Falling back to Layer 2.")
+        prompt = (
+            "You are the Fast LLM fact extraction and contradiction engine for open-research-lite.\n"
+            "Analyze the text and extract high-signal atomic factual claims, quantitative metrics, "
+            "and architectural/scientific properties.\n\n"
+            "Guidelines:\n"
+            "1. Isolate Subject-Predicate-Object triplets.\n"
+            "2. Distinguish singular properties from multi-valued properties (is_multi_valued=True for products, partners, features).\n"
+            "3. If a metric applies under a specific operational context (e.g., 'at idle', 'ambient temperature', 'peak load'), "
+            "record it in 'condition' so it is not mistaken for a contradiction.\n"
+            "4. If existing verified knowledge is provided below, check if the current source directly CONTRADICTS "
+            "any existing claim for the same entity and condition. If so, populate the 'contradictions' list with explicit reasoning.\n"
+            "5. Ignore navigation text, cookie banners, introductory background fluff, and repetitive SEO prose.\n\n"
+            f"SOURCE TITLE: {source_title}\n"
+            f"SOURCE URL: {source_url}\n"
+        )
 
-        return self.local_extractor.extract_facts(text_snippet, source_url, source_title)
+        if existing_facts_summary:
+            prompt += f"\nEXISTING SESSION KNOWLEDGE:\n{existing_facts_summary}\n"
+
+        prompt += f"\nSOURCE TEXT TO ANALYZE:\n{text_snippet}\n"
+
+        try:
+            result: ExtractionResult = await llm.ainvoke(prompt)
+            return result
+        except Exception as e:
+            logger.error(f"Fast LLM extraction call failed ({self.model_name}): {e}")
+            raise FactExtractionError(f"Fast LLM extraction failed ({self.model_name}): {e}") from e
+
+
+# Backward-compatible alias
+DualExtractionPipeline = FastLLMExtractor

@@ -1,9 +1,9 @@
 [project]
 name = "open-research-lite"
-version = "0.1.1"
-description = "Token-Efficient Ingestion Middleware & Concept-Diff Engine for Deep Research AI Agents."
+version = "0.3.0"
+description = "Token-Efficient Ingestion Middleware & Autonomous Research Agent with Differential Knowledge Graph."
 authors = [
-    { name = "DeepResearch-Lite Team" }
+    { name = "open research-lite Team" }
 ]
 readme = "README.md"
 license = "MIT"
@@ -23,7 +23,12 @@ dependencies = [
     "python-dotenv>=1.0.1",
     "pytest",
     "langchain-google-genai>=2.1.5",
+    "rich>=13.0.0",
+    "questionary>=2.0.0",
 ]
+
+[project.scripts]
+open-research = "open_research_lite.__main__:main"
 
 [project.optional-dependencies]
 dev = ["mypy>=1.11.1", "ruff>=0.6.1"]
@@ -34,6 +39,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+include = ["open_research_lite*"]
 
 [tool.setuptools.package-dir]
 "" = "src"

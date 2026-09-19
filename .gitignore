@@ -66,6 +66,8 @@ node_modules/
 tmp/
 temp/
 wandb/
+research_report.*
 
 .langgraph_api
+
 
