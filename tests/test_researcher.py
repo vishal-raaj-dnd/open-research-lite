@@ -264,6 +264,18 @@ def test_get_default_models():
     assert wri is not None
 
 
+@pytest.mark.asyncio
+async def test_duckduckgo_multi_tier_resilient_fetch():
+    """Verifies DuckDuckGo search multi-tier resolver executes cleanly."""
+    agent = Researcher(query="HBM4 High Bandwidth Memory", search_api="duckduckgo", max_results=2)
+    sources = await agent._fetch_sources()
+    assert isinstance(sources, list)
+    assert len(sources) > 0
+    assert "title" in sources[0]
+    assert "url" in sources[0]
+
+
+
 if __name__ == "__main__":
     print("Running test_researcher_initialization_and_alias...", flush=True)
     asyncio.run(test_researcher_initialization_and_alias())

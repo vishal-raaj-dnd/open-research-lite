@@ -316,14 +316,33 @@ Options:
 
                     elif is_search_error:
                         console.print(f"\n[bold red][Search Error][/bold red] {err_str}\n")
-                        retry_search = questionary.confirm(
-                            "Web search failed. Would you like to switch to free DuckDuckGo search (no API key required) and retry?",
-                            default=True,
-                            style=RED_STYLE
-                        ).ask()
-                        if retry_search:
-                            search_api = "duckduckgo"
-                            continue
+                        if search_api != "duckduckgo":
+                            retry_search = questionary.confirm(
+                                "Web search failed. Would you like to switch to free DuckDuckGo search (no API key required) and retry?",
+                                default=True,
+                                style=RED_STYLE
+                            ).ask()
+                            if retry_search:
+                                search_api = "duckduckgo"
+                                continue
+                        else:
+                            tav_key = os.getenv("TAVILY_API_KEY")
+                            if tav_key:
+                                switch_tav = questionary.confirm(
+                                    "DuckDuckGo search encountered an issue. Would you like to switch to Tavily Search and retry?",
+                                    default=True,
+                                    style=RED_STYLE
+                                ).ask()
+                                if switch_tav:
+                                    search_api = "tavily"
+                                    continue
+                            retry_same = questionary.confirm(
+                                "Search encountered a network issue. Would you like to retry?",
+                                default=True,
+                                style=RED_STYLE
+                            ).ask()
+                            if retry_same:
+                                continue
                         break
                     else:
                         console.print(f"\n[bold red][Error][/bold red] {err_str}\n")

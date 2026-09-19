@@ -204,8 +204,31 @@ class Researcher:
                 logger.error(f"Tavily search failed: {e}")
                 raise SearchProviderError(f"Tavily search failed: {e}") from e
 
-        # 2. DuckDuckGo Search (Strict, structured per-result list)
+        # 2. DuckDuckGo Search (Multi-tier resilient search: ddgs -> duckduckgo_search -> langchain -> direct HTML)
         elif chosen_provider == "duckduckgo":
+            # Tier 1: Direct ddgs / duckduckgo_search library
+            try:
+                try:
+                    from ddgs import DDGS
+                except ImportError:
+                    from duckduckgo_search import DDGS  # type: ignore
+
+                with DDGS() as ddgs_client:
+                    raw_items = list(ddgs_client.text(self.query, max_results=self.max_results))
+                if raw_items:
+                    results = []
+                    for item in raw_items:
+                        results.append({
+                            "title": item.get("title", f"Web result for {self.query}"),
+                            "url": item.get("href", item.get("link", "https://duckduckgo.com")),
+                            "content": item.get("body", item.get("snippet", ""))
+                        })
+                    if results:
+                        return results
+            except Exception as ddgs_err:
+                logger.debug(f"Direct DDGS search failed, attempting langchain wrapper: {ddgs_err}")
+
+            # Tier 2: LangChain DuckDuckGoSearchResults wrapper
             try:
                 from langchain_community.tools import DuckDuckGoSearchResults
                 ddg = DuckDuckGoSearchResults(max_results=self.max_results, output_format="list")
@@ -227,12 +250,44 @@ class Researcher:
                         "url": "https://duckduckgo.com",
                         "content": raw_res
                     }]
-                raise SearchProviderError(f"DuckDuckGo returned 0 results for query: '{self.query}'.")
-            except Exception as e:
-                if isinstance(e, SearchProviderError):
-                    raise
-                logger.error(f"DuckDuckGo search failed: {e}")
-                raise SearchProviderError(f"DuckDuckGo search failed: {e}") from e
+            except Exception as lc_err:
+                logger.debug(f"LangChain DDG search failed, attempting HTML fallback: {lc_err}")
+
+            # Tier 3: Native direct HTTP HTML scraping via requests & BeautifulSoup
+            try:
+                import requests
+                from bs4 import BeautifulSoup
+                resp = requests.get(
+                    "https://html.duckduckgo.com/html/",
+                    params={"q": self.query},
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                    },
+                    timeout=15
+                )
+                if resp.status_code == 200:
+                    soup = BeautifulSoup(resp.text, "html.parser")
+                    results = []
+                    for item in soup.find_all("div", class_="result__body")[:self.max_results]:
+                        title_elem = item.find("a", class_="result__url") or item.find("h2")
+                        snippet_elem = item.find("a", class_="result__snippet")
+                        url_elem = item.find("a", class_="result__url")
+                        if title_elem:
+                            raw_link = url_elem.get("href", "") if url_elem else "https://duckduckgo.com"
+                            results.append({
+                                "title": title_elem.get_text(strip=True),
+                                "url": raw_link,
+                                "content": snippet_elem.get_text(strip=True) if snippet_elem else ""
+                            })
+                    if results:
+                        return results
+            except Exception as html_err:
+                logger.debug(f"Direct HTML fallback failed: {html_err}")
+
+            raise SearchProviderError(
+                f"DuckDuckGo search failed across all mechanisms for query: '{self.query}'. "
+                "Please verify your network connection or install ddgs: `pip install -U ddgs`."
+            )
 
         else:
             raise ConfigurationError(
