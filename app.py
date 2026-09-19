@@ -99,7 +99,7 @@ PRESET_SCENARIOS = {
 }
 
 
-async def run_comparison(scenario_name: str, custom_query: str):
+async def run_comparison(scenario_name: str, api_key: Optional[str] = None):
     default_scenario = next(iter(PRESET_SCENARIOS.values()))
     sources = PRESET_SCENARIOS.get(scenario_name, default_scenario)
     
@@ -116,26 +116,28 @@ async def run_comparison(scenario_name: str, custom_query: str):
     # 2. ConceptDiffEngine Run
     graph = SessionKnowledgeGraph()
     telemetry = TelemetryTracker()
-    engine = ConceptDiffEngine(graph=graph, telemetry=telemetry)
+    resolved_key = (api_key or "").strip() or None
 
-    diff_outputs = []
-    for s in sources:
-        payload = await engine.process_observation(
-            raw_text=s["content"] * 3,
-            source_url=s["url"],
-            source_title=s["title"]
-        )
-        diff_outputs.append(payload)
+    try:
+        engine = ConceptDiffEngine(graph=graph, telemetry=telemetry, api_key=resolved_key)
+        diff_outputs = []
+        for s in sources:
+            payload = await engine.process_observation(
+                raw_text=s["content"] * 3,
+                source_url=s["url"],
+                source_title=s["title"]
+            )
+            diff_outputs.append(payload)
 
-    lite_text = "\n\n---\n\n".join(diff_outputs)
-    lite_words = len(lite_text.split())
-    lite_tokens = int(lite_words * 1.33)
-    lite_cost = (lite_tokens / 1_000_000.0) * 2.50
+        lite_text = "\n\n---\n\n".join(diff_outputs)
+        lite_words = len(lite_text.split())
+        lite_tokens = int(lite_words * 1.33)
+        lite_cost = (lite_tokens / 1_000_000.0) * 2.50
 
-    stats = telemetry.get_summary()
-    token_savings_pct = round(((base_tokens - lite_tokens) / base_tokens) * 100, 1) if base_tokens > 0 else 0.0
+        stats = telemetry.get_summary()
+        token_savings_pct = round(((base_tokens - lite_tokens) / base_tokens) * 100, 1) if base_tokens > 0 else 0.0
 
-    scorecard_md = f"""### Benchmark Scorecard
+        scorecard_md = f"""### Benchmark Scorecard
 | Metric | Standard Deep Research | open research-lite | Improvement |
 | :--- | :--- | :--- | :--- |
 | **Input Tokens** | `{base_tokens:,}` tokens | **`{lite_tokens:,}` tokens** | **{token_savings_pct}% Saved** |
@@ -144,8 +146,11 @@ async def run_comparison(scenario_name: str, custom_query: str):
 | **Conflicts Flagged**| Silent Overwrite | **`{stats['facts_conflicted']}` detected & flagged** | Factual Integrity |
 | **Redundant Fluff** | 100% Ingested | **`{stats['facts_discarded_duplicate']}` duplicates pruned** | High SNR |
 """
+        return baseline_text, lite_text, scorecard_md
 
-    return baseline_text, lite_text, scorecard_md
+    except Exception as exc:
+        err_msg = f"**Extraction Error**: {exc}\n\n*Please ensure a valid LLM API key (e.g. GEMINI_API_KEY) is configured in your environment or entered above.*"
+        return baseline_text, err_msg, f"### Benchmark Run Error\n\n```\n{exc}\n```"
 
 
 def launch_gradio():
@@ -167,9 +172,16 @@ def launch_gradio():
             scenario_dropdown = gr.Dropdown(
                 choices=list(PRESET_SCENARIOS.keys()),
                 value="HBM4 Architecture 2026 (Bandwidth & Power)",
-                label="Select Research Evaluation Scenario"
+                label="Select Research Evaluation Scenario",
+                scale=2
             )
-            run_btn = gr.Button("Run Live Side-by-Side Benchmark", variant="primary")
+            api_key_input = gr.Textbox(
+                label="API Key (Optional if configured in environment)",
+                placeholder="GEMINI_API_KEY, OPENAI_API_KEY, etc.",
+                type="password",
+                scale=2
+            )
+            run_btn = gr.Button("Run Live Side-by-Side Benchmark", variant="primary", scale=1)
 
         scorecard_display = gr.Markdown("### Benchmark Metrics will appear here upon execution.")
 
@@ -182,10 +194,9 @@ def launch_gradio():
                 gr.Markdown("### open research-lite (Concept-Diff Engine)")
                 lite_output = gr.Markdown(value="*Click 'Run Live Side-by-Side Benchmark' to start...*")
 
-
         run_btn.click(
-            fn=lambda s: asyncio.run(run_comparison(s, "")),
-            inputs=[scenario_dropdown],
+            fn=run_comparison,
+            inputs=[scenario_dropdown, api_key_input],
             outputs=[baseline_output, lite_output, scorecard_display]
         )
 

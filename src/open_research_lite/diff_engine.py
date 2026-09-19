@@ -5,6 +5,7 @@ diffs assertions against the live Session Knowledge Graph, and constructs token-
 """
 
 import logging
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 
@@ -176,8 +177,10 @@ class ConceptDiffEngine:
             temp_body.append("")
 
         if not added_facts and not conflicting_facts and not llm_contradictions:
-            clean_snippet = " ".join(raw_text.split()[:40])
-            temp_body.append(f"*Context note (background text with no novel assertions)*: \"{clean_snippet}...\"")
+            # Clean sentence boundary extraction without arbitrary word truncation
+            sentences = re.split(r'(?<=[.!?])\s+', raw_text.strip())
+            first_sentence = sentences[0].strip() if sentences else raw_text.strip()
+            temp_body.append(f"*Context note (background text with no novel assertions)*: \"{first_sentence}\"")
 
         body_str = "\n".join(temp_body)
         body_words = len(body_str.split())

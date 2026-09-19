@@ -4,6 +4,7 @@ import os
 import sys
 import asyncio
 import concurrent.futures
+import pytest
 
 # Ensure local src takes precedence over any pre-installed packages
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
@@ -20,6 +21,7 @@ from open_research_lite import (
 )
 
 
+@pytest.mark.asyncio
 async def test_session_knowledge_graph_deduplication():
     graph = SessionKnowledgeGraph()
     fact1 = FactAssertion(
@@ -45,6 +47,7 @@ async def test_session_knowledge_graph_deduplication():
     assert len(graph.facts) == 1
 
 
+@pytest.mark.asyncio
 async def test_multi_valued_relations_not_falsely_conflicted():
     """Verifies that multi-valued predicates (features, produces, models) are not flagged as contradictions."""
     graph = SessionKnowledgeGraph()
@@ -70,6 +73,7 @@ async def test_multi_valued_relations_not_falsely_conflicted():
     assert len(graph.facts) == 2
 
 
+@pytest.mark.asyncio
 async def test_conditional_metrics_prevent_false_contradictions():
     """Verifies that differing metrics under distinct conditions (e.g. idle vs peak) do not falsely conflict."""
     graph = SessionKnowledgeGraph()
@@ -95,6 +99,7 @@ async def test_conditional_metrics_prevent_false_contradictions():
     assert len(graph.facts) == 2
 
 
+@pytest.mark.asyncio
 async def test_numeric_conflict_detection():
     """Verifies that differing scalar metrics for the identical entity & condition are flagged as genuine conflicts."""
     graph = SessionKnowledgeGraph()
@@ -127,7 +132,7 @@ def test_thread_safety_concurrent_mutation():
                 subject=f"Entity_{thread_idx}",
                 predicate="measures",
                 object_val=f"val_{thread_idx}_{i}",
-                is_numeric=True
+                is_numeric=True  # numeric values are NOT added to entities set
             )
             graph.add_fact(fact)
 
@@ -136,7 +141,8 @@ def test_thread_safety_concurrent_mutation():
         concurrent.futures.wait(futures)
 
     assert len(graph.facts) == 250
-    assert len(graph.entities) == 255
+    # Numeric object_vals are excluded from entity set — only subjects are tracked
+    assert len(graph.entities) == 5
 
 
 class StubTestExtractor:
@@ -173,6 +179,7 @@ class StubTestExtractor:
         )
 
 
+@pytest.mark.asyncio
 async def test_concept_diff_engine_fluff_stripping():
     graph = SessionKnowledgeGraph()
     telemetry = TelemetryTracker()
@@ -205,6 +212,7 @@ async def test_concept_diff_engine_fluff_stripping():
     assert telemetry.discards_count > 0
 
 
+@pytest.mark.asyncio
 async def test_fast_llm_extractor_raises_on_missing_key():
     """Verifies that FastLLMExtractor strictly enforces API key requirement and does not silently fall back."""
     from open_research_lite.exceptions import FactExtractionError

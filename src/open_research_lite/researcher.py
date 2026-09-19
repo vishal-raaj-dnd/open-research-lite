@@ -30,7 +30,7 @@ class Researcher:
         self,
         query: str,
         report_type: str = "research_report",
-        search_api: str = "tavily",
+        search_api: str = "auto",
         max_results: int = 5,
         max_concurrency: int = 4,
         search_func: Optional[Callable[[str, int], Awaitable[List[Dict[str, str]]]]] = None,
@@ -56,16 +56,17 @@ class Researcher:
         self.search_func = search_func
         self.max_tokens = max_tokens
         
-        # Dual-Model Architecture (100% compatible with GPT-Researcher conventions):
-        # 1. Fast LLM / Extractor Sub-Model: Fast filter (Gemini 2.5 Flash, GPT-4o-Mini, Claude Haiku)
-        # 2. Smart LLM / Writer Main Model: High-reasoning report synthesizer (Claude Sonnet, GPT-4o, Gemini Pro)
-        self.extractor_model = extractor_model or fast_llm or fast_llm_model or "gemini-2.5-flash"
-        self.writer_model = writer_model or smart_llm or smart_llm_model or model_name or "gemini-2.5-flash"
+        # Dual-Model Architecture:
+        # Resolve models dynamically based on available API keys if not explicitly provided
+        from open_research_lite.models import resolve_api_key, get_default_models
+        default_ext, default_writer = get_default_models()
+
+        self.extractor_model = extractor_model or fast_llm or fast_llm_model or default_ext
+        self.writer_model = writer_model or smart_llm or smart_llm_model or model_name or default_writer
         self.fast_llm = self.extractor_model
         self.smart_llm = self.writer_model
         self.model_name = self.writer_model
 
-        from open_research_lite.models import resolve_api_key
         self.writer_api_key = writer_api_key or resolve_api_key(self.writer_model) or api_key
         self.extractor_api_key = extractor_api_key or resolve_api_key(self.extractor_model) or api_key
         self.api_key = self.writer_api_key
@@ -122,8 +123,13 @@ class Researcher:
                 return diff_payload
 
         tasks = [_ingest_source(s) for s in self.sources]
-        results = await asyncio.gather(*tasks, return_exceptions=False)
-        self.diff_payloads = [r for r in results if r is not None]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        for i, r in enumerate(results):
+            if isinstance(r, BaseException):
+                src_title = self.sources[i].get("title", self.sources[i].get("url", f"source[{i}]"))
+                logger.error(f"Failed to process source '{src_title}': {r}")
+            elif r is not None:
+                self.diff_payloads.append(r)
 
         return self.diff_payloads
 
@@ -149,7 +155,7 @@ class Researcher:
         return self.report
 
     async def _fetch_sources(self) -> List[Dict[str, str]]:
-        """Executes search based on configured backend."""
+        """Executes search based on configured backend with zero silent fallbacks."""
         # 0. Custom search callable (Enterprise / Custom Vector DB)
         if self.search_func:
             try:
@@ -158,11 +164,21 @@ class Researcher:
                     return custom_results
             except Exception as e:
                 logger.error(f"Custom search provider failed: {e}")
-                raise SearchProviderError(f"Custom search provider execution failed: {e}")
+                raise SearchProviderError(f"Custom search provider execution failed: {e}") from e
 
-        # 1. Tavily Search
-        tavily_key = os.getenv("TAVILY_API_KEY")
-        if (self.search_api == "tavily" or not self.search_api) and tavily_key:
+        # Resolve provider
+        chosen_provider = self.search_api
+        if chosen_provider == "auto":
+            chosen_provider = "tavily" if os.getenv("TAVILY_API_KEY") else "duckduckgo"
+
+        # 1. Tavily Search (Strict, no silent degradation)
+        if chosen_provider == "tavily":
+            tavily_key = os.getenv("TAVILY_API_KEY")
+            if not tavily_key:
+                raise ConfigurationError(
+                    "Tavily search provider selected but TAVILY_API_KEY is not set. "
+                    "Set TAVILY_API_KEY in environment or use search_api='duckduckgo'."
+                )
             try:
                 from tavily import TavilyClient
                 client = TavilyClient(api_key=tavily_key)
@@ -181,29 +197,47 @@ class Researcher:
                     })
                 if results:
                     return results
+                raise SearchProviderError(f"Tavily returned 0 search results for query: '{self.query}'.")
             except Exception as e:
-                logger.warning(f"Tavily search encountered error: {e}. Attempting secondary search provider.")
+                if isinstance(e, (ConfigurationError, SearchProviderError)):
+                    raise
+                logger.error(f"Tavily search failed: {e}")
+                raise SearchProviderError(f"Tavily search failed: {e}") from e
 
-        # 2. DuckDuckGo Search
-        try:
-            from langchain_community.tools import DuckDuckGoSearchResults
-            ddg = DuckDuckGoSearchResults(max_results=self.max_results)
-            raw_res = ddg.run(self.query)
-            if raw_res and str(raw_res).strip():
-                return [{
-                    "title": f"Web results for {self.query}",
-                    "url": "https://duckduckgo.com",
-                    "content": str(raw_res)
-                }]
-        except Exception as e:
-            logger.warning(f"DuckDuckGo search encountered error: {e}.")
+        # 2. DuckDuckGo Search (Strict, structured per-result list)
+        elif chosen_provider == "duckduckgo":
+            try:
+                from langchain_community.tools import DuckDuckGoSearchResults
+                ddg = DuckDuckGoSearchResults(max_results=self.max_results, output_format="list")
+                raw_res = ddg.run(self.query)
+                if isinstance(raw_res, list) and len(raw_res) > 0:
+                    results = []
+                    for item in raw_res:
+                        if isinstance(item, dict):
+                            results.append({
+                                "title": item.get("title", f"Web result for {self.query}"),
+                                "url": item.get("link", "https://duckduckgo.com"),
+                                "content": item.get("snippet", "")
+                            })
+                    if results:
+                        return results
+                elif isinstance(raw_res, str) and raw_res.strip():
+                    return [{
+                        "title": f"Web results for {self.query}",
+                        "url": "https://duckduckgo.com",
+                        "content": raw_res
+                    }]
+                raise SearchProviderError(f"DuckDuckGo returned 0 results for query: '{self.query}'.")
+            except Exception as e:
+                if isinstance(e, SearchProviderError):
+                    raise
+                logger.error(f"DuckDuckGo search failed: {e}")
+                raise SearchProviderError(f"DuckDuckGo search failed: {e}") from e
 
-        # 3. No search results available - raise explicit SearchProviderError without mock data
-        raise SearchProviderError(
-            f"No search results returned for query: '{self.query}'. "
-            "Please ensure TAVILY_API_KEY or internet connectivity is configured, "
-            "or supply custom sources via 'conduct_research(custom_sources=...)' or 'search_func'."
-        )
+        else:
+            raise ConfigurationError(
+                f"Unsupported search provider '{self.search_api}'. Must be 'tavily', 'duckduckgo', or 'auto'."
+            )
 
 
     async def _generate_report_llm(self, context_data: str, custom_prompt: Optional[str]) -> str:
@@ -233,10 +267,10 @@ class Researcher:
             f"VERIFIED RESEARCH CONTEXT:\n{context_data}\n"
         )
 
-        from open_research_lite.models import get_chat_model
+        from open_research_lite.models import get_chat_model, with_retry
         llm = get_chat_model(self.writer_model, self.writer_api_key, max_tokens=self.max_tokens)
 
-        res = await llm.ainvoke(prompt)
+        res = await with_retry(lambda: llm.ainvoke(prompt))
         report_text = str(res.content).strip()
         attribution = f"\n\n---\n*Synthesized by: {self.writer_model} (Fact-filtered via: {self.extractor_model}) via open research-lite*"
         return report_text + attribution
@@ -347,7 +381,7 @@ class Researcher:
         """Exports a standalone interactive HTML dossier with embedded visual knowledge graph."""
         tel = self.telemetry.get_summary()
         stats = self.graph.get_stats()
-        mermaid_code = self.graph.to_mermaid(max_edges=25)
+        mermaid_code = self.graph.to_mermaid()
 
         # Convert inline markdown tokens to HTML elements
         def _format_inline(txt: str) -> str:

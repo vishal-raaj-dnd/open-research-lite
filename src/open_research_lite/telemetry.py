@@ -51,16 +51,15 @@ class TelemetryTracker:
                 "total_facts_extracted": self.adds_count + self.discards_count + self.conflicts_count
             }
 
-
     def print_summary(self):
         saved_pct = self.get_token_savings_percentage()
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("OPEN-RESEARCH-LITE TELEMETRY SUMMARY")
-        print("="*60)
+        print("=" * 60)
         print(f"  • Raw Input Words Intercepted : {self.total_input_words:,}")
         print(f"  • Output Diff Words Sent      : {self.total_output_words:,}")
         print(f"  • Token Reduction Percentage  : {saved_pct}% Saved")
         print(f"  • Facts Added (DIFF_ADD)      : {self.adds_count}")
         print(f"  • Facts Discarded (DISCARD)   : {self.discards_count}")
         print(f"  • Conflicts Flagged (CONFLICT): {self.conflicts_count}")
-        print("="*60 + "\n")
+        print("=" * 60 + "\n")

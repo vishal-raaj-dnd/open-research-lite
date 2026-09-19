@@ -189,17 +189,22 @@ async def test_custom_search_provider_and_json_export():
 
 @pytest.mark.asyncio
 async def test_researcher_fails_without_credentials():
-    """Verifies that Researcher raises FactExtractionError when called without API keys or injected extractor."""
+    """Verifies that a missing-key failure is isolated per-source (logged, not raised).
+    
+    With gather(return_exceptions=True) the session survives a single bad source;
+    diff_payloads will be empty and the knowledge graph will have zero facts.
+    """
     agent = Researcher(query="Test Missing Credentials", model_name="unknown-model")
     agent.extractor_api_key = None
     agent.engine.extractor.api_key = None
-    try:
-        await agent.conduct_research(custom_sources=[{
-            "url": "https://test.com", "title": "Test", "content": "Some test content"
-        }])
-        assert False, "Expected FactExtractionError was not raised"
-    except FactExtractionError as e:
-        assert "No API key" in str(e)
+
+    diff_payloads = await agent.conduct_research(custom_sources=[{
+        "url": "https://test.com", "title": "Test", "content": "Some test content"
+    }])
+
+    # Error is captured per-source, not propagated — session continues
+    assert diff_payloads == [], "Failed sources should produce an empty diff_payloads list"
+    assert len(agent.get_knowledge_graph().facts) == 0
 
 
 @pytest.mark.asyncio
@@ -218,6 +223,47 @@ async def test_exceptions_hierarchy():
     assert "provider" in str(err)
 
 
+@pytest.mark.asyncio
+async def test_search_provider_zero_fallback():
+    """Verifies that selecting Tavily without an API key raises ConfigurationError instead of silently falling back."""
+    from open_research_lite.exceptions import ConfigurationError
+    orig = os.environ.pop("TAVILY_API_KEY", None)
+    try:
+        agent = Researcher(query="Zero Fallback Test", search_api="tavily")
+        with pytest.raises(ConfigurationError) as exc_info:
+            await agent._fetch_sources()
+        assert "TAVILY_API_KEY" in str(exc_info.value)
+    finally:
+        if orig:
+            os.environ["TAVILY_API_KEY"] = orig
+
+
+def test_anthropic_model_max_token_resolution():
+    """Verifies Anthropic models resolve to their maximum native token ceiling without 400 errors."""
+    from open_research_lite.models import get_chat_model
+    
+    m_haiku = get_chat_model("claude-3-5-haiku-latest", api_key="sk-ant-test")
+    assert m_haiku.max_tokens == 8192
+
+    m_opus = get_chat_model("claude-3-opus-latest", api_key="sk-ant-test")
+    assert m_opus.max_tokens == 4096
+
+    m_37 = get_chat_model("claude-3-7-sonnet-latest", api_key="sk-ant-test")
+    assert m_37.max_tokens == 64000
+
+    # Explicit override respected
+    m_custom = get_chat_model("claude-3-5-haiku-latest", api_key="sk-ant-test", max_tokens=2048)
+    assert m_custom.max_tokens == 2048
+
+
+def test_get_default_models():
+    """Verifies get_default_models auto-detects models from environment."""
+    from open_research_lite.models import get_default_models
+    ext, wri = get_default_models()
+    assert ext is not None
+    assert wri is not None
+
+
 if __name__ == "__main__":
     print("Running test_researcher_initialization_and_alias...", flush=True)
     asyncio.run(test_researcher_initialization_and_alias())
@@ -231,4 +277,10 @@ if __name__ == "__main__":
     asyncio.run(test_researcher_fails_without_credentials())
     print("Running test_exceptions_hierarchy...", flush=True)
     asyncio.run(test_exceptions_hierarchy())
+    print("Running test_search_provider_zero_fallback...", flush=True)
+    asyncio.run(test_search_provider_zero_fallback())
+    print("Running test_anthropic_model_max_token_resolution...", flush=True)
+    test_anthropic_model_max_token_resolution()
+    print("Running test_get_default_models...", flush=True)
+    test_get_default_models()
     print("[OK] All Researcher API tests passed!", flush=True)

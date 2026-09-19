@@ -5,13 +5,59 @@ Provides distinct model roles:
 2. Main Writer Model: High-reasoning model that synthesizes the final intelligence dossier.
 """
 
+import asyncio
+import logging
 import os
-from typing import Any, Dict, List, Optional
+import random
+from typing import Any, Callable, Coroutine, Dict, List, Optional, TypeVar
 from dotenv import load_dotenv
 
 load_dotenv()
 
 from open_research_lite.exceptions import ConfigurationError
+
+logger = logging.getLogger("open_research_lite.models")
+
+T = TypeVar("T")
+
+_RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
+_RETRYABLE_ERROR_KEYWORDS = ("rate limit", "too many requests", "server error", "overloaded", "timeout", "connection")
+
+
+async def with_retry(
+    coro_factory: Callable[[], Coroutine[Any, Any, T]],
+    max_attempts: int = 4,
+    base_delay: float = 1.5,
+    max_delay: float = 60.0,
+) -> T:
+    """Async exponential backoff retry wrapper for LLM API calls.
+
+    Retries on rate-limit (429), transient server errors (500/502/503/504),
+    and any exception whose message contains common transient error keywords.
+    Raises the final exception if all attempts are exhausted.
+    """
+    last_exc: Exception = RuntimeError("No attempts made")
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return await coro_factory()
+        except Exception as exc:
+            last_exc = exc
+            exc_msg = str(exc).lower()
+            is_retryable = any(kw in exc_msg for kw in _RETRYABLE_ERROR_KEYWORDS)
+            # Also check for HTTP status codes embedded in exception messages
+            is_retryable = is_retryable or any(
+                str(code) in exc_msg for code in _RETRYABLE_STATUS_CODES
+            )
+            if not is_retryable or attempt == max_attempts:
+                raise
+            delay = min(base_delay * (2 ** (attempt - 1)) + random.uniform(0, 1), max_delay)
+            logger.warning(
+                f"LLM call attempt {attempt}/{max_attempts} failed ({exc}). "
+                f"Retrying in {delay:.1f}s..."
+            )
+            await asyncio.sleep(delay)
+    raise last_exc
+
 
 
 SMALL_EXTRACTOR_MODELS: List[Dict[str, str]] = [
@@ -60,6 +106,23 @@ def resolve_api_key(model_name: str) -> Optional[str]:
     return None
 
 
+def get_default_models() -> tuple[str, str]:
+    """Auto-detects the optimal (extractor_model, writer_model) based on configured environment keys."""
+    if os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"):
+        return "gemini-2.5-flash", "gemini-2.5-flash"
+    elif os.getenv("OPENAI_API_KEY"):
+        return "gpt-4o-mini", "gpt-4o"
+    elif os.getenv("ANTHROPIC_API_KEY"):
+        return "claude-3-5-haiku-latest", "claude-3-5-sonnet-latest"
+    elif os.getenv("GROQ_API_KEY"):
+        return "llama-3.1-8b-instant", "llama-3.3-70b-versatile"
+    elif os.getenv("DEEPSEEK_API_KEY"):
+        return "deepseek-chat", "deepseek-reasoner"
+    elif os.getenv("MISTRAL_API_KEY"):
+        return "mistral-small-latest", "mistral-large-latest"
+    return "gemini-2.5-flash", "gemini-2.5-flash"
+
+
 def get_chat_model(
     model_name: str, 
     api_key: Optional[str] = None, 
@@ -73,9 +136,20 @@ def get_chat_model(
         key = api_key or os.getenv("ANTHROPIC_API_KEY")
         if not key:
             raise ConfigurationError(f"Anthropic API key missing for '{model_name}'. Set ANTHROPIC_API_KEY.")
-        # ChatAnthropic requires max_tokens; default to full standard model capability (8,192) or user override
-        token_cap = max_tokens or 8192
-        return ChatAnthropic(model=model_name, api_key=key, temperature=0.1, max_tokens=token_cap)
+        # ChatAnthropic requires max_tokens to be set; resolve to the model's native maximum allowed output tokens
+        anthropic_kwargs: Dict[str, Any] = {"model": model_name, "api_key": key, "temperature": 0.1}
+        if max_tokens is not None:
+            anthropic_kwargs["max_tokens"] = max_tokens
+        else:
+            if "3-7" in model_lower:
+                anthropic_kwargs["max_tokens"] = 64000
+            elif "3-5" in model_lower:
+                anthropic_kwargs["max_tokens"] = 8192
+            elif "opus" in model_lower:
+                anthropic_kwargs["max_tokens"] = 4096
+            else:
+                anthropic_kwargs["max_tokens"] = 8192
+        return ChatAnthropic(**anthropic_kwargs)
 
     elif "deepseek" in model_lower:
         from langchain_openai import ChatOpenAI

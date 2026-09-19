@@ -79,10 +79,11 @@ def _get_api_key_interactive(model_id: str, role_title: str) -> Optional[str]:
     if env_key:
         return env_key
     
-    return questionary.password(
+    val = questionary.password(
         f"Enter API key for {role_title} ({model_id}) [press Enter if configured in environment]:",
         style=RED_STYLE
     ).ask()
+    return val.strip() if val and val.strip() else None
 
 
 def main():
@@ -109,14 +110,16 @@ Options:
             render_banner(console)
 
         search_api = "tavily" if os.getenv("TAVILY_API_KEY") else "duckduckgo"
-        ext_key = resolve_api_key("gemini-2.5-flash")
-        wri_key = resolve_api_key("gemini-2.5-flash")
+        from open_research_lite.models import get_default_models
+        default_ext, default_wri = get_default_models()
+        ext_key = resolve_api_key(default_ext)
+        wri_key = resolve_api_key(default_wri)
 
         asyncio.run(_execute_research(
             console=console or Console(),
             query=query,
-            extractor_model="gemini-2.5-flash",
-            writer_model="gemini-2.5-flash",
+            extractor_model=default_ext,
+            writer_model=default_wri,
             extractor_api_key=ext_key,
             writer_api_key=wri_key,
             search_api=search_api,

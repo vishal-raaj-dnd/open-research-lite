@@ -105,7 +105,9 @@ class SessionKnowledgeGraph:
 
             self.facts.append(fact)
             self.entities.add(fact.subject)
-            self.entities.add(fact.object_val)
+            # Only add object_val as an entity when it represents a named concept, not a raw metric
+            if not fact.is_numeric:
+                self.entities.add(fact.object_val)
             return True
 
     def record_contradiction(

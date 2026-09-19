@@ -121,7 +121,7 @@ class FastLLMExtractor:
         source_title: str,
         existing_facts_summary: str
     ) -> ExtractionResult:
-        from open_research_lite.models import get_chat_model
+        from open_research_lite.models import get_chat_model, with_retry
 
         base_llm = get_chat_model(self.model_name, self.api_key)
         llm = base_llm.with_structured_output(ExtractionResult)
@@ -148,7 +148,7 @@ class FastLLMExtractor:
         prompt += f"\nSOURCE TEXT TO ANALYZE:\n{text_snippet}\n"
 
         try:
-            result: ExtractionResult = await llm.ainvoke(prompt)
+            result: ExtractionResult = await with_retry(lambda: llm.ainvoke(prompt))
             return result
         except Exception as e:
             logger.error(f"Fast LLM extraction call failed ({self.model_name}): {e}")
